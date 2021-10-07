@@ -3,7 +3,7 @@ import bpy
 import os
 from mathutils import Vector
 from bpy.types import Menu
-from bpy.props import FloatProperty, StringProperty
+from bpy.props import FloatProperty, BoolProperty, StringProperty
 from bpy_extras.object_utils import object_data_add
 
 bl_info = {
@@ -27,8 +27,11 @@ def join(objects):
 
 
 def get_font(filepath):
-    bpy.ops.font.open(filepath=filepath)
-    return next(filter(lambda x: x.filepath == filepath, bpy.data.fonts))
+    if filepath:
+        bpy.ops.font.open(filepath=filepath)
+        return next(filter(lambda x: x.filepath == filepath, bpy.data.fonts))
+    else:
+        return bpy.data.fonts['Bfont']
 
 
 def create_number(context, number, font_path, size, number_depth, location, rotation):
@@ -127,6 +130,11 @@ class D6(bpy.types.Operator):
         unit='LENGTH'
     )
 
+    add_numbers: BoolProperty(
+        name="Generate Numbers",
+        default=True
+    )
+
     number_depth: FloatProperty(
         name="Number Depth",
         description="Depth of the numbers on the die",
@@ -155,7 +163,7 @@ class D6(bpy.types.Operator):
         body_object = self.create_cube(context)
 
         # create number curves
-        if self.font_path:
+        if self.add_numbers:
             self.create_numbers(context, body_object)
 
         return {'FINISHED'}
