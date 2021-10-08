@@ -9,13 +9,13 @@ from bpy_extras.object_utils import object_data_add
 HALF_PI = math.pi / 2
 
 bl_info = {
-    "name": "Dice Gen",
-    "author": "Long Tran",
-    "version": (0, 1, 0),
-    "blender": (2, 80, 0),
-    "location": "View3D > Add > Mesh",
-    "description": "Generate dice meshes",
-    "category": "Add Mesh",
+    'name': 'Dice Gen',
+    'author': 'Long Tran',
+    'version': (0, 1, 0),
+    'blender': (2, 93, 0),
+    'location': 'View3D > Add > Mesh',
+    'description': 'Generate dice meshes',
+    'category': 'Add Mesh',
 }
 
 
@@ -28,6 +28,13 @@ def join(objects):
     bpy.ops.object.join(ctx)
 
 
+def validate_font_path(filepath):
+    # set font to emtpy if it's not a ttf file
+    if filepath and os.path.splitext(filepath)[1].lower() not in ('.ttf', '.otf'):
+        return ''
+    return filepath
+
+
 def get_font(filepath):
     if filepath:
         bpy.data.fonts.load(filepath=filepath, check_existing=True)
@@ -35,6 +42,20 @@ def get_font(filepath):
     else:
         bpy.data.fonts.load(filepath='<builtin>', check_existing=True)
         return bpy.data.fonts['Bfont']
+
+
+def apply_boolean_modifier(context, body_object, numbers_object):
+    """
+    Add a BOOLEAN modifier to body_object that targets
+    :param context:
+    :param body_object:
+    :param numbers_object
+    :return:
+    """
+    context.view_layer.objects.active = body_object
+    bpy.ops.object.modifier_add(type='BOOLEAN')
+    bpy.context.object.modifiers[0].object = bpy.data.objects[numbers_object.name]
+    bpy.context.object.modifiers[0].show_viewport = False
 
 
 def create_numbers(context, locations, rotations, font_path, font_size, number_depth):
@@ -58,13 +79,13 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     font = get_font(font_path)
 
     # create the text curve
-    font_curve = bpy.data.curves.new(type="FONT", name="number_{}".format(number))
+    font_curve = bpy.data.curves.new(type='FONT', name=f'number_{number}')
     font_curve.body = str(number)
     font_curve.font = font
     font_curve.size = font_size
 
     # create object from curve
-    curve_obj = bpy.data.objects.new("temp_number", font_curve)
+    curve_obj = bpy.data.objects.new('temp_number', font_curve)
 
     # convert curve to mesh
     mesh = curve_obj.to_mesh().copy()
@@ -93,6 +114,34 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     context.object.modifiers[0].offset = 0
 
     return mesh_object
+
+
+def create_mesh(context, vertices, faces, name):
+    """
+    Create a mesh from a list of vertices and faces.
+
+    :param context: blender context
+    :param vertices: list of vertex tuples
+    :param faces: list of face tuples
+    :param name: name of the object
+    :return:
+    """
+    verts = [Vector(i) for i in vertices]
+
+    # turn n-gons in quads and tri's
+    faces = create_polys(faces)
+
+    # generate object
+    # Create new mesh
+    mesh = bpy.data.meshes.new(name)
+
+    # Make a mesh from a list of verts/edges/faces.
+    mesh.from_pydata(verts, [], faces)
+
+    # Update mesh geometry after adding stuff.
+    mesh.update()
+
+    return object_data_add(context, mesh, operator=None)
 
 
 def create_polys(poly):
@@ -125,18 +174,18 @@ def create_polys(poly):
     return faces
 
 
-class D6(bpy.types.Operator):
+class D6Generator(bpy.types.Operator):
     """Generate a D6"""
-    bl_idname = "mesh.d6_add"
-    bl_label = "D6"
-    bl_description = "Generate a cube dice"
+    bl_idname = 'mesh.d6_add'
+    bl_label = 'D6'
+    bl_description = 'Generate a cube dice'
     bl_options = {'REGISTER', 'UNDO'}
 
     base_font_scale = 1
 
     size: FloatProperty(
-        name="Size",
-        description="Face-to-face size of the die",
+        name='Size',
+        description='Face-to-face size of the die',
         min=1,
         soft_min=1,
         max=100,
@@ -146,13 +195,13 @@ class D6(bpy.types.Operator):
     )
 
     add_numbers: BoolProperty(
-        name="Generate Numbers",
+        name='Generate Numbers',
         default=True
     )
 
     number_scale: FloatProperty(
-        name="Number Scale",
-        description="Size of the numbers on the die",
+        name='Number Scale',
+        description='Size of the numbers on the die',
         min=0.1,
         soft_min=0.1,
         max=2,
@@ -161,8 +210,8 @@ class D6(bpy.types.Operator):
     )
 
     number_depth: FloatProperty(
-        name="Number Depth",
-        description="Depth of the numbers on the die",
+        name='Number Depth',
+        description='Depth of the numbers on the die',
         min=0.1,
         soft_min=0.1,
         max=2,
@@ -172,16 +221,15 @@ class D6(bpy.types.Operator):
     )
 
     font_path: StringProperty(
-        name="Font",
-        description="Number font",
+        name='Font',
+        description='Number font',
         maxlen=1024,
         subtype='FILE_PATH',
     )
 
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
-        if self.font_path and os.path.splitext(self.font_path)[1].lower() != '.ttf':
-            self.font_path = ""
+        self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
         body_object = self.create_cube(context)
@@ -194,34 +242,15 @@ class D6(bpy.types.Operator):
 
     def create_cube(self, context):
         # Calculate the necessary constants
-        s = 0.5
+        s = 0.5 * self.size
 
         # create the vertices and faces
         v = [(-s, -s, -s), (s, -s, -s), (s, s, -s), (-s, s, -s), (-s, -s, s), (s, -s, s), (s, s, s), (-s, s, s)]
         faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
 
-        verts = [Vector(i) for i in v]
-
-        # turn n-gons in quads and tri's
-        faces = create_polys(faces)
-
-        # resize
-        verts = [i * self.size for i in verts]
-
-        # generate object
-        # Create new mesh
-        mesh = bpy.data.meshes.new("Cube")
-
-        # Make a mesh from a list of verts/edges/faces.
-        mesh.from_pydata(verts, [], faces)
-
-        # Update mesh geometry after adding stuff.
-        mesh.update()
-
-        return object_data_add(context, mesh, operator=None)
+        return create_mesh(context, v, faces, 'Cube')
 
     def create_numbers(self, context, body_object):
-
         locations = [
             (0, -0.5, 0),
             (-0.5, 0, 0),
@@ -243,12 +272,82 @@ class D6(bpy.types.Operator):
         font_size = self.base_font_scale * self.size * self.number_scale
 
         numbers_object = create_numbers(context, locations, rotations, self.font_path, font_size, self.number_depth)
-        context.view_layer.objects.active = body_object
 
-        # add boolean modifier
-        bpy.ops.object.modifier_add(type='BOOLEAN')
-        bpy.context.object.modifiers[0].object = bpy.data.objects[numbers_object.name]
-        bpy.context.object.modifiers[0].show_viewport = False
+        apply_boolean_modifier(context, body_object, numbers_object)
+
+
+class D8Generator(bpy.types.Operator):
+    """Generate a D8"""
+    bl_idname = 'mesh.d8_add'
+    bl_label = 'D8'
+    bl_description = 'Generate a octahedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    base_font_scale = 1
+
+    size: FloatProperty(
+        name='Size',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=15,
+        unit='LENGTH'
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        body_object = self.create_octahedron(context)
+
+        return {'FINISHED'}
+
+    def create_octahedron(self, context):
+        # calculate circumscribed sphere radius from inscribed sphere radius
+        # diameter of the inscribed sphere is the face 2 face length of the octahedron
+        s = (self.size * math.sqrt(3)) / 2
+
+        # create the vertices and faces
+        v = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
+        faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
+
+        return create_mesh(context, v, faces, 'Octahedron')
 
 
 class MeshDiceAdd(Menu):
@@ -256,13 +355,14 @@ class MeshDiceAdd(Menu):
     Dice menu under "Add Mesh"
     """
 
-    bl_idname = "VIEW3D_MT_mesh_dice_add"
-    bl_label = "Dice"
+    bl_idname = 'VIEW3D_MT_mesh_dice_add'
+    bl_label = 'Dice'
 
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator("mesh.d6_add", text="D6")
+        layout.operator('mesh.d6_add', text='D6')
+        layout.operator('mesh.d8_add', text='D8')
 
 
 # Define "Extras" menu
@@ -271,12 +371,13 @@ def menu_func(self, context):
     layout.operator_context = 'INVOKE_REGION_WIN'
 
     layout.separator()
-    layout.menu("VIEW3D_MT_mesh_dice_add", text="Dice", icon="CUBE")
+    layout.menu('VIEW3D_MT_mesh_dice_add', text='Dice', icon='CUBE')
 
 
 classes = [
     MeshDiceAdd,
-    D6
+    D6Generator,
+    D8Generator
 ]
 
 
