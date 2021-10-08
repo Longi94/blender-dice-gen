@@ -30,13 +30,27 @@ def join(objects):
 
 def get_font(filepath):
     if filepath:
-        bpy.ops.font.open(filepath=filepath)
+        bpy.data.fonts.load(filepath=filepath, check_existing=True)
         return next(filter(lambda x: x.filepath == filepath, bpy.data.fonts))
     else:
+        bpy.data.fonts.load(filepath='<builtin>', check_existing=True)
         return bpy.data.fonts['Bfont']
 
 
-def create_number(context, number, font_path, size, number_depth, location, rotation):
+def create_numbers(context, locations, rotations, font_path, font_size, number_depth):
+    numbers = []
+    # create the number meshes
+    for i in range(len(locations)):
+        number_object = create_number(context, i + 1, font_path, font_size, number_depth, locations[i],
+                                      rotations[i])
+        numbers.append(number_object)
+
+    # join the numbers into a single object
+    join(numbers)
+    return context.view_layer.objects.active
+
+
+def create_number(context, number, font_path, font_size, number_depth, location, rotation):
     """
     Create a number mesh that will be used in a boolean modifier
     """
@@ -47,7 +61,7 @@ def create_number(context, number, font_path, size, number_depth, location, rota
     font_curve = bpy.data.curves.new(type="FONT", name="number_{}".format(number))
     font_curve.body = str(number)
     font_curve.font = font
-    font_curve.size = size
+    font_curve.size = font_size
 
     # create object from curve
     curve_obj = bpy.data.objects.new("temp_number", font_curve)
@@ -65,9 +79,9 @@ def create_number(context, number, font_path, size, number_depth, location, rota
     mesh_object.select_set(True)
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
 
-    mesh_object.location.x = location[0] * size
-    mesh_object.location.y = location[1] * size
-    mesh_object.location.z = location[2] * size
+    mesh_object.location.x = location[0]
+    mesh_object.location.y = location[1]
+    mesh_object.location.z = location[2]
 
     mesh_object.rotation_euler.x = rotation[0]
     mesh_object.rotation_euler.y = rotation[1]
@@ -118,6 +132,8 @@ class D6(bpy.types.Operator):
     bl_description = "Generate a cube dice"
     bl_options = {'REGISTER', 'UNDO'}
 
+    base_font_scale = 1
+
     size: FloatProperty(
         name="Size",
         description="Face-to-face size of the die",
@@ -132,6 +148,16 @@ class D6(bpy.types.Operator):
     add_numbers: BoolProperty(
         name="Generate Numbers",
         default=True
+    )
+
+    number_scale: FloatProperty(
+        name="Number Scale",
+        description="Size of the numbers on the die",
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
     )
 
     number_depth: FloatProperty(
@@ -213,17 +239,10 @@ class D6(bpy.types.Operator):
             (-HALF_PI, 0, 0)
         ]
 
-        numbers = []
-        # create the number meshes
-        for i in range(len(locations)):
-            number_object = create_number(context, i + 1, self.font_path, self.size, self.number_depth, locations[i],
-                                          rotations[i])
-            numbers.append(number_object)
+        locations = [(v[0] * self.size, v[1] * self.size, v[2] * self.size) for v in locations]
+        font_size = self.base_font_scale * self.size * self.number_scale
 
-        # join the numbers into a single object
-        join(numbers)
-        numbers_object = context.view_layer.objects.active
-
+        numbers_object = create_numbers(context, locations, rotations, self.font_path, font_size, self.number_depth)
         context.view_layer.objects.active = body_object
 
         # add boolean modifier
