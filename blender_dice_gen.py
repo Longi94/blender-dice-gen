@@ -19,6 +19,63 @@ bl_info = {
 }
 
 
+class Mesh:
+
+    def __init__(self, name):
+        self.vertices = None
+        self.faces = None
+        self.name = name
+        self.dice_mesh = None
+
+    def create(self, context):
+        verts = [Vector(i) for i in self.vertices]
+
+        # turn n-gons in quads and tri's
+        faces = create_polys(self.faces)
+
+        # generate object
+        # Create new mesh
+        mesh = bpy.data.meshes.new(self.name)
+
+        # Make a mesh from a list of verts/edges/faces.
+        mesh.from_pydata(verts, [], faces)
+
+        # Update mesh geometry after adding stuff.
+        mesh.update()
+
+        self.dice_mesh = object_data_add(context, mesh, operator=None)
+        return self.dice_mesh
+
+
+class Cube(Mesh):
+
+    def __init__(self, name, size):
+        super().__init__(name)
+
+        # Calculate the necessary constants
+        self.v_coord_const = 0.5 * size
+        s = self.v_coord_const
+
+        # create the vertices and faces
+        self.vertices = [(-s, -s, -s), (s, -s, -s), (s, s, -s), (-s, s, -s), (-s, -s, s), (s, -s, s), (s, s, s),
+                         (-s, s, s)]
+        self.faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
+
+
+class Octahedron(Mesh):
+    def __init__(self, name, size):
+        super().__init__(name)
+
+        # calculate circumscribed sphere radius from inscribed sphere radius
+        # diameter of the inscribed sphere is the face 2 face length of the octahedron
+        self.v_coord_const = (size * math.sqrt(3)) / 2
+        s = self.v_coord_const
+
+        # create the vertices and faces
+        self.vertices = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
+        self.faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
+
+
 def join(objects):
     bpy.context.view_layer.objects.active = objects[0]
     ctx = bpy.context.copy()
@@ -116,34 +173,6 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     return mesh_object
 
 
-def create_mesh(context, vertices, faces, name):
-    """
-    Create a mesh from a list of vertices and faces.
-
-    :param context: blender context
-    :param vertices: list of vertex tuples
-    :param faces: list of face tuples
-    :param name: name of the object
-    :return:
-    """
-    verts = [Vector(i) for i in vertices]
-
-    # turn n-gons in quads and tri's
-    faces = create_polys(faces)
-
-    # generate object
-    # Create new mesh
-    mesh = bpy.data.meshes.new(name)
-
-    # Make a mesh from a list of verts/edges/faces.
-    mesh.from_pydata(verts, [], faces)
-
-    # Update mesh geometry after adding stuff.
-    mesh.update()
-
-    return object_data_add(context, mesh, operator=None)
-
-
 def create_polys(poly):
     """
     this function creates a chain of quads and, when necessary, a remaining tri
@@ -232,23 +261,14 @@ class D6Generator(bpy.types.Operator):
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        body_object = self.create_cube(context)
+        cube = Cube('d6', self.size)
+        cube.create(context)
 
         # create number curves
         if self.add_numbers:
-            self.create_numbers(context, body_object)
+            self.create_numbers(context, cube.dice_mesh)
 
         return {'FINISHED'}
-
-    def create_cube(self, context):
-        # Calculate the necessary constants
-        s = 0.5 * self.size
-
-        # create the vertices and faces
-        v = [(-s, -s, -s), (s, -s, -s), (s, s, -s), (-s, s, -s), (-s, -s, s), (s, -s, s), (s, s, s), (-s, s, s)]
-        faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
-
-        return create_mesh(context, v, faces, 'Cube')
 
     def create_numbers(self, context, body_object):
         locations = [
@@ -334,20 +354,10 @@ class D8Generator(bpy.types.Operator):
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        body_object = self.create_octahedron(context)
+        octahedron = Octahedron('d8', self.size)
+        body_object = octahedron.create(context)
 
         return {'FINISHED'}
-
-    def create_octahedron(self, context):
-        # calculate circumscribed sphere radius from inscribed sphere radius
-        # diameter of the inscribed sphere is the face 2 face length of the octahedron
-        s = (self.size * math.sqrt(3)) / 2
-
-        # create the vertices and faces
-        v = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
-        faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
-
-        return create_mesh(context, v, faces, 'Octahedron')
 
 
 class MeshDiceAdd(Menu):
