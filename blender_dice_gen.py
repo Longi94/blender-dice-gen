@@ -6,6 +6,8 @@ from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty
 from bpy_extras.object_utils import object_data_add
 
+HALF_PI = math.pi / 2
+
 bl_info = {
     "name": "Dice Gen",
     "author": "Long Tran",
@@ -194,14 +196,28 @@ class D6(bpy.types.Operator):
 
     def create_numbers(self, context, body_object):
 
-        locations = [(0, 0, -0.5), (0, 0, 0.5)]
-        rotation = [(0, math.pi, 0), (0, 0, 0)]
+        locations = [
+            (0, -0.5, 0),
+            (-0.5, 0, 0),
+            (0, 0, 0.5),
+            (0, 0, -0.5),
+            (0.5, 0, 0),
+            (0, 0.5, 0),
+        ]
+        rotations = [
+            (HALF_PI, 0, 0),
+            (math.pi, HALF_PI, 0),
+            (0, 0, 0),
+            (math.pi, 0, 0),
+            (0, HALF_PI, 0),
+            (-HALF_PI, 0, 0)
+        ]
 
         numbers = []
         # create the number meshes
-        for i in range(2):
+        for i in range(len(locations)):
             number_object = create_number(context, i + 1, self.font_path, self.size, self.number_depth, locations[i],
-                                          rotation[i])
+                                          rotations[i])
             numbers.append(number_object)
 
         # join the numbers into a single object
