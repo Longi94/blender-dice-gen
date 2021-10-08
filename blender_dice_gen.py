@@ -26,6 +26,7 @@ class Mesh:
         self.faces = None
         self.name = name
         self.dice_mesh = None
+        self.base_font_scale = 1
 
     def create(self, context):
         verts = [Vector(i) for i in self.vertices]
@@ -46,6 +47,22 @@ class Mesh:
         self.dice_mesh = object_data_add(context, mesh, operator=None)
         return self.dice_mesh
 
+    def get_number_locations(self):
+        raise NotImplementedError()
+
+    def get_number_rotations(self):
+        raise NotImplementedError()
+
+    def create_numbers(self, context, size, number_scale, number_depth, font_path):
+        locations = self.get_number_locations()
+        rotations = self.get_number_rotations()
+
+        font_size = self.base_font_scale * size * number_scale
+
+        numbers_object = create_numbers(context, locations, rotations, font_path, font_size, number_depth)
+
+        apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+
 
 class Cube(Mesh):
 
@@ -61,8 +78,23 @@ class Cube(Mesh):
                          (-s, s, s)]
         self.faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
 
+    def get_number_locations(self):
+        s = self.v_coord_const
+        return [(0, -s, 0), (-s, 0, 0), (0, 0, s), (0, 0, -s), (s, 0, 0), (0, s, 0)]
+
+    def get_number_rotations(self):
+        return [
+            (HALF_PI, 0, 0),
+            (math.pi, HALF_PI, 0),
+            (0, 0, 0),
+            (math.pi, 0, 0),
+            (0, HALF_PI, 0),
+            (-HALF_PI, 0, 0)
+        ]
+
 
 class Octahedron(Mesh):
+
     def __init__(self, name, size):
         super().__init__(name)
 
@@ -74,6 +106,12 @@ class Octahedron(Mesh):
         # create the vertices and faces
         self.vertices = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
         self.faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
+
+    def get_number_locations(self):
+        return []
+
+    def get_number_rotations(self):
+        return []
 
 
 def join(objects):
@@ -266,34 +304,9 @@ class D6Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            self.create_numbers(context, cube.dice_mesh)
+            cube.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
 
         return {'FINISHED'}
-
-    def create_numbers(self, context, body_object):
-        locations = [
-            (0, -0.5, 0),
-            (-0.5, 0, 0),
-            (0, 0, 0.5),
-            (0, 0, -0.5),
-            (0.5, 0, 0),
-            (0, 0.5, 0),
-        ]
-        rotations = [
-            (HALF_PI, 0, 0),
-            (math.pi, HALF_PI, 0),
-            (0, 0, 0),
-            (math.pi, 0, 0),
-            (0, HALF_PI, 0),
-            (-HALF_PI, 0, 0)
-        ]
-
-        locations = [(v[0] * self.size, v[1] * self.size, v[2] * self.size) for v in locations]
-        font_size = self.base_font_scale * self.size * self.number_scale
-
-        numbers_object = create_numbers(context, locations, rotations, self.font_path, font_size, self.number_depth)
-
-        apply_boolean_modifier(context, body_object, numbers_object)
 
 
 class D8Generator(bpy.types.Operator):
@@ -355,7 +368,10 @@ class D8Generator(bpy.types.Operator):
 
         # create the cube mesh
         octahedron = Octahedron('d8', self.size)
-        body_object = octahedron.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            octahedron.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
 
         return {'FINISHED'}
 
