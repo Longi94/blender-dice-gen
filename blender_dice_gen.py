@@ -1,7 +1,7 @@
 import math
 import bpy
 import os
-from mathutils import Vector
+from mathutils import Vector, Matrix
 from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty
 from bpy_extras.object_utils import object_data_add
@@ -137,6 +137,47 @@ class Octahedron(Mesh):
         ]
 
 
+def apply_transform(ob, use_location=False, use_rotation=False, use_scale=False):
+    """
+    https://blender.stackexchange.com/questions/159538/how-to-apply-all-transformations-to-an-object-at-low-level
+    :param ob:
+    :param use_location:
+    :param use_rotation:
+    :param use_scale:
+    :return:
+    """
+    mb = ob.matrix_basis
+    I = Matrix()
+    loc, rot, scale = mb.decompose()
+
+    # rotation
+    T = Matrix.Translation(loc)
+    # R = rot.to_matrix().to_4x4()
+    R = mb.to_3x3().normalized().to_4x4()
+    S = Matrix.Diagonal(scale).to_4x4()
+
+    transform = [I, I, I]
+    basis = [T, R, S]
+
+    def swap(i):
+        transform[i], basis[i] = basis[i], transform[i]
+
+    if use_location:
+        swap(0)
+    if use_rotation:
+        swap(1)
+    if use_scale:
+        swap(2)
+
+    M = transform[0] @ transform[1] @ transform[2]
+    if hasattr(ob.data, "transform"):
+        ob.data.transform(M)
+    for c in ob.children:
+        c.matrix_local = M @ c.matrix_local
+
+    ob.matrix_basis = basis[0] @ basis[1] @ basis[2]
+
+
 def join(objects):
     bpy.context.view_layer.objects.active = objects[0]
     ctx = bpy.context.copy()
@@ -186,6 +227,7 @@ def create_numbers(context, locations, rotations, font_path, font_size, number_d
 
     # join the numbers into a single object
     join(numbers)
+    apply_transform(context.view_layer.objects.active, use_rotation=True)
     return context.view_layer.objects.active
 
 
