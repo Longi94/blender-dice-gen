@@ -107,11 +107,34 @@ class Octahedron(Mesh):
         self.vertices = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
         self.faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
 
+        self.base_font_scale = 0.7
+
     def get_number_locations(self):
-        return []
+        c = self.v_coord_const / 3
+        return [
+            (c, c, c),
+            (c, c, -c),
+            (c, -c, -c),
+            (c, -c, c),
+            (-c, c, -c),
+            (-c, c, c),
+            (-c, -c, c),
+            (-c, -c, -c),
+        ]
 
     def get_number_rotations(self):
-        return []
+        # dihedral angle / 2
+        da = math.acos(-1 / 3)
+        return [
+            (da / 2, 0, math.pi * 3 / 4),
+            (-math.pi + da / 2, 0, -math.pi / 4),
+            (-math.pi + da / 2, 0, -math.pi * 3 / 4),
+            (da / 2, 0, math.pi * 1 / 4),
+            (-math.pi + da / 2, 0, math.pi * 1 / 4),
+            (da / 2, 0, -math.pi * 3 / 4),
+            (da / 2, 0, -math.pi * 1 / 4),
+            (-math.pi + da / 2, 0, math.pi * 3 / 4),
+        ]
 
 
 def join(objects):
@@ -368,6 +391,7 @@ class D8Generator(bpy.types.Operator):
 
         # create the cube mesh
         octahedron = Octahedron('d8', self.size)
+        octahedron.create(context)
 
         # create number curves
         if self.add_numbers:
