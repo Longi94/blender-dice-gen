@@ -76,9 +76,6 @@ def create_number(context, number, font_path, size, number_depth, location, rota
     context.object.modifiers[0].thickness = 2 * number_depth
     context.object.modifiers[0].offset = 0
 
-    # hide object
-    bpy.ops.object.hide_view_set(unselected=False)
-
     return mesh_object
 
 
@@ -155,9 +152,8 @@ class D6(bpy.types.Operator):
 
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
-        if self.font_path and os.path.splitext(self.font_path)[1] != '.ttf':
+        if self.font_path and os.path.splitext(self.font_path)[1].lower() != '.ttf':
             self.font_path = ""
-            return {'CANCELLED'}
 
         # create the cube mesh
         body_object = self.create_cube(context)
@@ -217,6 +213,7 @@ class D6(bpy.types.Operator):
         # add boolean modifier
         bpy.ops.object.modifier_add(type='BOOLEAN')
         bpy.context.object.modifiers[0].object = bpy.data.objects[numbers_object.name]
+        bpy.context.object.modifiers[0].show_viewport = False
 
 
 class MeshDiceAdd(Menu):
