@@ -68,19 +68,23 @@ class Mesh:
         self.dice_mesh = object_data_add(context, mesh, operator=None)
         return self.dice_mesh
 
+    def get_numbers(self):
+        raise []
+
     def get_number_locations(self):
-        raise NotImplementedError()
+        raise []
 
     def get_number_rotations(self):
-        raise NotImplementedError()
+        raise []
 
     def create_numbers(self, context, size, number_scale, number_depth, font_path):
+        numbers = self.get_numbers()
         locations = self.get_number_locations()
         rotations = self.get_number_rotations()
 
         font_size = self.base_font_scale * size * number_scale
 
-        numbers_object = create_numbers(context, locations, rotations, font_path, font_size, number_depth)
+        numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth)
 
         apply_boolean_modifier(context, self.dice_mesh, numbers_object)
 
@@ -98,6 +102,9 @@ class Cube(Mesh):
         self.vertices = [(-s, -s, -s), (s, -s, -s), (s, s, -s), (-s, s, -s), (-s, -s, s), (s, -s, s), (s, s, s),
                          (-s, s, s)]
         self.faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
+
+    def get_numbers(self):
+        return [str(i + 1) for i in range(6)]
 
     def get_number_locations(self):
         s = self.v_coord_const
@@ -129,6 +136,9 @@ class Octahedron(Mesh):
         self.faces = [[4, 0, 2], [4, 2, 1], [4, 1, 3], [4, 3, 0], [5, 2, 0], [5, 1, 2], [5, 3, 1], [5, 0, 3]]
 
         self.base_font_scale = 0.7
+
+    def get_numbers(self):
+        return [str(i + 1) for i in range(8)]
 
     def get_number_locations(self):
         c = self.circumscribed_r / 3
@@ -181,6 +191,9 @@ class Dodecahedron(Mesh):
                       [9, 14, 2, 18, 11], [13, 1, 17, 10, 8], [13, 8, 12, 4, 5], [13, 5, 15, 3, 1]]
 
         self.base_font_scale = 0.5
+
+    def get_numbers(self):
+        return [str(i + 1) for i in range(12)]
 
     def get_number_locations(self):
         dual_e = self.size / 2 / CONSTANTS['icosahedron']['circumscribed_r']
@@ -269,6 +282,9 @@ class Icosahedron(Mesh):
                       [4, 1, 9], [4, 9, 8], [8, 9, 6], [8, 6, 2]]
 
         self.base_font_scale = 0.3
+
+    def get_numbers(self):
+        return [str(i + 1) for i in range(20)]
 
     def get_number_locations(self):
         dual_e = self.size / 2 / CONSTANTS['octahedron']['circumscribed_r']
@@ -468,13 +484,13 @@ def apply_boolean_modifier(context, body_object, numbers_object):
     bpy.context.object.modifiers[0].show_viewport = False
 
 
-def create_numbers(context, locations, rotations, font_path, font_size, number_depth):
-    numbers = []
+def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth):
+    number_objs = []
     # create the number meshes
     for i in range(len(locations)):
-        number_object = create_number(context, i + 1, font_path, font_size, number_depth, locations[i],
+        number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
                                       rotations[i])
-        numbers.append(number_object)
+        number_objs.append(number_object)
 
     # join the numbers into a single object
     join(numbers)
