@@ -12,6 +12,11 @@ HALF_PI = math.pi / 2
 
 # https://dmccooey.com/polyhedra
 CONSTANTS = {
+    'tetrahedron': {
+        'dihedral_angle': acos(1 / 3),
+        'height': sqrt(2 / 3),
+        'c0': sqrt(2) / 4
+    },
     'octahedron': {
         'dihedral_angle': acos(sqrt(5) / -5),
         'circumscribed_r': (sqrt(3) + sqrt(15)) / 4,
@@ -69,13 +74,13 @@ class Mesh:
         return self.dice_mesh
 
     def get_numbers(self):
-        raise []
+        return []
 
     def get_number_locations(self):
-        raise []
+        return []
 
     def get_number_rotations(self):
-        raise []
+        return []
 
     def create_numbers(self, context, size, number_scale, number_depth, font_path):
         numbers = self.get_numbers()
@@ -87,6 +92,65 @@ class Mesh:
         numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth)
 
         apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+
+
+class Tetrahedron(Mesh):
+    def __init__(self, name, size, number_center_offset):
+        super().__init__(name)
+        self.size = size
+        self.number_center_offset = number_center_offset
+
+        c0 = CONSTANTS['tetrahedron']['c0'] / CONSTANTS['tetrahedron']['height'] * size
+
+        self.vertices = [(c0, -c0, c0), (c0, c0, -c0), (-c0, c0, c0), (-c0, -c0, -c0)]
+        self.faces = [[0, 1, 2], [1, 0, 3], [2, 3, 0], [3, 2, 1]]
+
+        self.base_font_scale = 0.3
+
+    def get_numbers(self):
+        return [str(math.floor(i / 3) + 1) for i in range(12)]
+
+    def get_number_locations(self):
+        # face centers
+        centers = [Vector((
+            ((self.vertices[f[0]][0] + self.vertices[f[1]][0] + self.vertices[f[2]][0]) / 3),
+            ((self.vertices[f[0]][1] + self.vertices[f[1]][1] + self.vertices[f[2]][1]) / 3),
+            ((self.vertices[f[0]][2] + self.vertices[f[1]][2] + self.vertices[f[2]][2]) / 3)
+        )) for f in self.faces]
+        vertices = [Vector(v) for v in self.vertices]
+
+        location_vectors = [
+            centers[0].lerp(vertices[2], self.number_center_offset),
+            centers[2].lerp(vertices[2], self.number_center_offset),
+            centers[3].lerp(vertices[2], self.number_center_offset),
+            centers[0].lerp(vertices[1], self.number_center_offset),
+            centers[1].lerp(vertices[1], self.number_center_offset),
+            centers[3].lerp(vertices[1], self.number_center_offset),
+            centers[0].lerp(vertices[0], self.number_center_offset),
+            centers[1].lerp(vertices[0], self.number_center_offset),
+            centers[2].lerp(vertices[0], self.number_center_offset),
+            centers[1].lerp(vertices[3], self.number_center_offset),
+            centers[2].lerp(vertices[3], self.number_center_offset),
+            centers[3].lerp(vertices[3], self.number_center_offset)
+        ]
+
+        return [(v.x, v.y, v.z) for v in location_vectors]
+
+    def get_number_rotations(self):
+        return [
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi / 4, HALF_PI),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, -math.pi / 4, 0),
+            ((math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, math.pi / 4),
+            (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, -math.pi / 4),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 3 / 4, 0),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 5 / 4, math.pi * 3 / 2),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, -math.pi / 4, -math.pi),
+            (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, math.pi, -math.pi * 3 / 4),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi / 4, -HALF_PI),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 5 / 4, HALF_PI),
+            (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, math.pi * 3 / 4),
+            (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 3 / 4, math.pi)
+        ]
 
 
 class Cube(Mesh):
@@ -543,6 +607,83 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     return mesh_object
 
 
+class D4Generator(bpy.types.Operator):
+    """Generate a D4"""
+    bl_idname = 'mesh.d4_add'
+    bl_label = 'D4'
+    bl_description = 'Generate a tetrahedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    size: FloatProperty(
+        name='Face2point Length',
+        description='Face-to-point size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=20,
+        unit='LENGTH'
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    number_center_offset: FloatProperty(
+        name='Number Center Offset',
+        description='Distance of numbers from the center of a face',
+        min=0.0,
+        soft_min=0.0,
+        max=1,
+        soft_max=1,
+        default=0.5,
+        unit='LENGTH'
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        die = Tetrahedron('d4', self.size, self.number_center_offset)
+        die.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+
+        return {'FINISHED'}
+
+
 class D6Generator(bpy.types.Operator):
     """Generate a D6"""
     bl_idname = 'mesh.d6_add'
@@ -818,6 +959,7 @@ class MeshDiceAdd(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
+        layout.operator('mesh.d4_add', text='D4 Tetrahedron')
         layout.operator('mesh.d6_add', text='D6 Cube')
         layout.operator('mesh.d8_add', text='D8 Octahedron')
         layout.operator('mesh.d12_add', text='D12 Dodecahedron')
@@ -835,6 +977,7 @@ def menu_func(self, context):
 
 classes = [
     MeshDiceAdd,
+    D4Generator,
     D6Generator,
     D8Generator,
     D12Generator,

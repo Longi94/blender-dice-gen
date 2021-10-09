@@ -12,6 +12,7 @@ The add-on will create 2 objects, a blank dice mesh and the numbers. The blank d
 
 ## Supported dice
 
+- D4 Tetrahedron
 - D6 Cube
 - D8 Octahedron
 - D12 Dodecahedron
@@ -19,7 +20,6 @@ The add-on will create 2 objects, a blank dice mesh and the numbers. The blank d
 
 Dice TODO
 
-- D4 Tetrahedron
 - D4 Crystal
 - D4 Shard
 - D10 Deltohedron
