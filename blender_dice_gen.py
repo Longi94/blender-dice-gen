@@ -249,6 +249,145 @@ class Dodecahedron(Mesh):
         return [(a.x, a.y, a.z) for a in angles]
 
 
+class Icosahedron(Mesh):
+
+    def __init__(self, name, size):
+        super().__init__(name)
+        self.size = size
+
+        # Calculate the necessary constants https://dmccooey.com/polyhedra/Icosahedron.html
+        edge_length = size / 2 / CONSTANTS['icosahedron']['inscribed_r']
+
+        c0 = edge_length * CONSTANTS['icosahedron']['c0']
+        c1 = edge_length * CONSTANTS['icosahedron']['c1']
+
+        self.vertices = [(c1, 0.0, c0), (c1, 0.0, -c0), (-c1, 0.0, c0), (-c1, 0.0, -c0), (c0, c1, 0.0), (c0, -c1, 0.0),
+                         (-c0, c1, 0.0), (-c0, -c1, 0.0), (0.0, c0, c1), (0.0, c0, -c1), (0.0, -c0, c1),
+                         (0.0, -c0, -c1)]
+        self.faces = [[0, 2, 10], [0, 10, 5], [0, 5, 4], [0, 4, 8], [0, 8, 2], [3, 1, 11], [3, 11, 7], [3, 7, 6],
+                      [3, 6, 9], [3, 9, 1], [2, 6, 7], [2, 7, 10], [10, 7, 11], [10, 11, 5], [5, 11, 1], [5, 1, 4],
+                      [4, 1, 9], [4, 9, 8], [8, 9, 6], [8, 6, 2]]
+
+        self.base_font_scale = 0.3
+
+    def get_number_locations(self):
+        dual_e = self.size / 2 / CONSTANTS['octahedron']['circumscribed_r']
+
+        c0 = CONSTANTS['octahedron']['c0'] * dual_e
+        c1 = CONSTANTS['octahedron']['c1'] * dual_e
+        s = CONSTANTS['octahedron']['c2'] * dual_e
+
+        return [
+            (0.0, s, c1),
+            (-c0, -c0, -c0),
+            (s, c1, 0.0),
+            (s, -c1, 0.0),
+            (-c0, -c0, c0),
+            (c1, 0.0, -s),
+            (-c0, c0, c0),
+            (0.0, s, -c1),
+            (c1, 0.0, s),
+            (-c0, c0, -c0),
+            (c0, -c0, c0),
+            (-c1, 0.0, -s),
+            (0.0, -s, c1),
+            (c0, -c0, -c0),
+            (-c1, 0.0, s),
+            (c0, c0, -c0),
+            (-s, c1, 0.0),
+            (-s, -c1, 0.0),
+            (c0, c0, c0),
+            (0.0, -s, -c1)
+        ]
+
+    def get_number_rotations(self):
+        angles = [Euler((0, 0, 0), 'XYZ') for _ in range(20)]
+
+        # TODO magic numbers copied out of blender with alignment trick, try to find exact equation
+
+        angles[0].x = -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2
+
+        angles[1].x = -0.918438
+        angles[1].y = -2.82743
+        angles[1].z = -4.15881
+
+        angles[2].x = HALF_PI
+        angles[2].y = 5 / 6 * math.pi
+        angles[2].z = math.pi - ((math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2)
+
+        angles[3].x = HALF_PI
+        angles[3].y = -math.pi / 6
+        angles[3].z = (math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2
+
+        angles[4].x = -0.918438
+        angles[4].y = -0.314159
+        angles[4].z = 2.12437
+
+        angles[5].x = HALF_PI
+        angles[5].y = math.pi / 3
+        angles[5].z = HALF_PI
+        angles[5].rotate(Euler((0, (math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[6].x = -0.918438
+        angles[6].y = 0.314159
+        angles[6].z = 1.01722
+
+        angles[7].x = -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2
+        angles[7].y = math.pi
+
+        angles[8].x = -HALF_PI
+        angles[8].y = -math.pi / 3
+        angles[8].z = -HALF_PI
+        angles[8].rotate(Euler((0, -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[9].x = -4.06003
+        angles[9].y = 0.314159
+        angles[9].z = -2.12437
+
+        angles[10].x = -0.918438
+        angles[10].y = 0.314159
+        angles[10].z = -2.12437
+
+        angles[11].x = HALF_PI
+        angles[11].y = -math.pi / 3
+        angles[11].z = -HALF_PI
+        angles[11].rotate(Euler((0, -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[12].x = -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2
+        angles[12].z = math.pi
+
+        angles[13].x = 2.22315
+        angles[13].y = 0.314159
+        angles[13].z = 1.01722
+
+        angles[14].x = -HALF_PI
+        angles[14].y = math.pi / 3
+        angles[14].z = HALF_PI
+        angles[14].rotate(Euler((0, (math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[15].x = -0.918438
+        angles[15].y = -2.82743
+        angles[15].z = -1.01722
+
+        angles[16].x = HALF_PI
+        angles[16].y = 7 / 6 * math.pi
+        angles[16].z = math.pi + ((math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2)
+
+        angles[17].x = HALF_PI
+        angles[17].y = math.pi / 6
+        angles[17].z = -(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2
+
+        angles[18].x = -0.918438
+        angles[18].y = -0.314159
+        angles[18].z = -1.01722
+
+        angles[19].x = math.pi
+        angles[19].z = 2 / 3 * math.pi
+        angles[19].rotate(Euler((-(math.pi - CONSTANTS['icosahedron']['dihedral_angle']) / 2, 0, 0), 'XYZ'))
+
+        return [(a.x, a.y, a.z) for a in angles]
+
+
 def apply_transform(ob, use_location=False, use_rotation=False, use_scale=False):
     """
     https://blender.stackexchange.com/questions/159538/how-to-apply-all-transformations-to-an-object-at-low-level
@@ -395,8 +534,6 @@ class D6Generator(bpy.types.Operator):
     bl_description = 'Generate a cube dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    base_font_scale = 1
-
     size: FloatProperty(
         name='Face2face Length',
         description='Face-to-face size of the die',
@@ -462,8 +599,6 @@ class D8Generator(bpy.types.Operator):
     bl_label = 'D8'
     bl_description = 'Generate a octahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
-
-    base_font_scale = 1
 
     size: FloatProperty(
         name='Face2face Length',
@@ -531,8 +666,6 @@ class D12Generator(bpy.types.Operator):
     bl_description = 'Generate a dodecahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    base_font_scale = 1
-
     size: FloatProperty(
         name='Face2face Length',
         description='Face-to-face size of the die',
@@ -592,6 +725,72 @@ class D12Generator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class D20Generator(bpy.types.Operator):
+    """Generate a D20"""
+    bl_idname = 'mesh.d20_add'
+    bl_label = 'D20'
+    bl_description = 'Generate an icosahedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    size: FloatProperty(
+        name='Face2face Length',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=20,
+        unit='LENGTH'
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        die = Icosahedron('d20', self.size)
+        die.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+
+        return {'FINISHED'}
+
+
 class MeshDiceAdd(Menu):
     """
     Dice menu under "Add Mesh"
@@ -603,9 +802,10 @@ class MeshDiceAdd(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.operator('mesh.d6_add', text='D6')
-        layout.operator('mesh.d8_add', text='D8')
-        layout.operator('mesh.d12_add', text='D12')
+        layout.operator('mesh.d6_add', text='D6 Cube')
+        layout.operator('mesh.d8_add', text='D8 Octahedron')
+        layout.operator('mesh.d12_add', text='D12 Dodecahedron')
+        layout.operator('mesh.d20_add', text='D20 Icosahedron')
 
 
 # Define "Extras" menu
@@ -621,7 +821,8 @@ classes = [
     MeshDiceAdd,
     D6Generator,
     D8Generator,
-    D12Generator
+    D12Generator,
+    D20Generator
 ]
 
 
