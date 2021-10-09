@@ -1,13 +1,33 @@
 import math
 import bpy
 import os
-from mathutils import Vector, Matrix
+from math import sqrt, acos
+from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty
 from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createSolid, createPolys
 
 HALF_PI = math.pi / 2
+
+# https://dmccooey.com/polyhedra
+CONSTANTS = {
+    'octahedron': {
+        'dihedral_angle': acos(sqrt(5) / -5),
+        'circumscribed_r': (sqrt(3) + sqrt(15)) / 4,
+        'inscribed_r': sqrt(10 * (25 + 11 * sqrt(5))) / 20,
+        'c0': (1 + sqrt(5)) / 4,
+        'c1': (3 + sqrt(5)) / 4,
+        'c2': 0.5
+    },
+    'icosahedron': {
+        'dihedral_angle': acos(sqrt(5) / -3),
+        'circumscribed_r': sqrt(2 * (5 + sqrt(5))) / 4,
+        'inscribed_r': (3 * sqrt(3) + sqrt(15)) / 12,
+        'c0': (1 + sqrt(5)) / 4,
+        'c1': 0.5
+    }
+}
 
 bl_info = {
     'name': 'Dice Gen',
@@ -136,6 +156,97 @@ class Octahedron(Mesh):
             (da / 2, 0, -math.pi * 1 / 4),
             (-math.pi + da / 2, 0, math.pi * 3 / 4),
         ]
+
+
+class Dodecahedron(Mesh):
+
+    def __init__(self, name, size):
+        super().__init__(name)
+        self.size = size
+
+        # Calculate the necessary constants https://dmccooey.com/polyhedra/Dodecahedron.html
+        edge_length = size / 2 / CONSTANTS['octahedron']['inscribed_r']
+
+        c0 = CONSTANTS['octahedron']['c0'] * edge_length
+        c1 = CONSTANTS['octahedron']['c1'] * edge_length
+        s = CONSTANTS['octahedron']['c2'] * edge_length
+
+        self.vertices = [(0.0, s, c1), (0.0, s, -c1), (0.0, -s, c1), (0.0, -s, -c1), (c1, 0.0, s), (c1, 0.0, -s),
+                         (-c1, 0.0, s), (-c1, 0.0, -s), (s, c1, 0.0), (s, -c1, 0.0), (-s, c1, 0.0), (-s, -c1, 0.0),
+                         (c0, c0, c0), (c0, c0, -c0), (c0, -c0, c0), (c0, -c0, -c0), (-c0, c0, c0), (-c0, c0, -c0),
+                         (-c0, -c0, c0), (-c0, -c0, -c0)]
+
+        self.faces = [[0, 2, 14, 4, 12], [0, 12, 8, 10, 16], [0, 16, 6, 18, 2], [7, 6, 16, 10, 17],
+                      [7, 17, 1, 3, 19], [7, 19, 11, 18, 6], [9, 11, 19, 3, 15], [9, 15, 5, 4, 14],
+                      [9, 14, 2, 18, 11], [13, 1, 17, 10, 8], [13, 8, 12, 4, 5], [13, 5, 15, 3, 1]]
+
+        self.base_font_scale = 0.5
+
+    def get_number_locations(self):
+        dual_e = self.size / 2 / CONSTANTS['icosahedron']['circumscribed_r']
+        c0 = dual_e * CONSTANTS['icosahedron']['c0']
+        c1 = dual_e * CONSTANTS['icosahedron']['c1']
+        return [
+            (c1, 0.0, c0),
+            (0.0, c0, c1),
+            (-c1, 0.0, c0),
+            (0.0, -c0, c1),
+            (c0, -c1, 0.0),
+            (c0, c1, 0.0),
+            (-c0, -c1, 0.0),
+            (-c0, c1, 0.0),
+            (0.0, c0, -c1),
+            (c1, 0.0, -c0),
+            (0.0, -c0, -c1),
+            (-c1, 0.0, -c0),
+        ]
+
+    def get_number_rotations(self):
+        angles = [Euler((0, 0, 0), 'XYZ') for _ in range(12)]
+
+        angles[0].z = math.radians(-162)
+        angles[0].rotate(Euler((0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[1].z = math.radians(36)
+        angles[1].rotate(Euler((CONSTANTS['octahedron']['dihedral_angle'] / -2, 0, 0), 'XYZ'))
+
+        angles[2].z = HALF_PI
+        angles[2].x = -(math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2
+
+        angles[3].z = math.radians(144)
+        angles[3].rotate(Euler((CONSTANTS['octahedron']['dihedral_angle'] / 2, 0, 0), 'XYZ'))
+
+        angles[4].y = HALF_PI
+        angles[4].rotate(Euler((-math.radians(108), 0, 0), 'XYZ'))
+        angles[4].rotate(Euler((0, 0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / -2), 'XYZ'))
+
+        angles[5].y = -HALF_PI
+        angles[5].rotate(Euler((-math.radians(72), 0, 0), 'XYZ'))
+        angles[5].rotate(Euler((0, 0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2), 'XYZ'))
+
+        angles[6].y = -HALF_PI
+        angles[6].rotate(Euler((math.radians(108), 0, 0), 'XYZ'))
+        angles[6].rotate(Euler((0, 0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2), 'XYZ'))
+
+        angles[7].y = HALF_PI
+        angles[7].rotate(Euler((math.radians(72), 0, 0), 'XYZ'))
+        angles[7].rotate(Euler((0, 0, -(math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2), 'XYZ'))
+
+        angles[8].z = math.radians(-36)
+        angles[8].rotate(Euler((CONSTANTS['octahedron']['dihedral_angle'] / 2, 0, 0), 'XYZ'))
+
+        angles[9].x = math.pi
+        angles[9].z = HALF_PI
+        angles[9].rotate(Euler((0, -(math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        angles[10].x = math.pi
+        angles[10].z = math.radians(36)
+        angles[10].rotate(Euler((-CONSTANTS['octahedron']['dihedral_angle'] / 2, 0, 0), 'XYZ'))
+
+        angles[11].z = math.radians(342)
+        angles[11].rotate(Euler((0, math.pi + (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2, 0), 'XYZ'))
+
+        return [(a.x, a.y, a.z) for a in angles]
 
 
 def apply_transform(ob, use_location=False, use_rotation=False, use_scale=False):
@@ -413,6 +524,74 @@ class D8Generator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class D12Generator(bpy.types.Operator):
+    """Generate a D12"""
+    bl_idname = 'mesh.d12_add'
+    bl_label = 'D12'
+    bl_description = 'Generate a dodecahedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    base_font_scale = 1
+
+    size: FloatProperty(
+        name='Face2face Length',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=18,
+        unit='LENGTH'
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        die = Dodecahedron('d12', self.size)
+        die.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+
+        return {'FINISHED'}
+
+
 class MeshDiceAdd(Menu):
     """
     Dice menu under "Add Mesh"
@@ -426,6 +605,7 @@ class MeshDiceAdd(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator('mesh.d6_add', text='D6')
         layout.operator('mesh.d8_add', text='D8')
+        layout.operator('mesh.d12_add', text='D12')
 
 
 # Define "Extras" menu
@@ -440,7 +620,8 @@ def menu_func(self, context):
 classes = [
     MeshDiceAdd,
     D6Generator,
-    D8Generator
+    D8Generator,
+    D12Generator
 ]
 
 
