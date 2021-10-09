@@ -557,7 +557,7 @@ def create_numbers(context, numbers, locations, rotations, font_path, font_size,
         number_objs.append(number_object)
 
     # join the numbers into a single object
-    join(numbers)
+    join(number_objs)
     apply_transform(context.view_layer.objects.active, use_rotation=True)
     return context.view_layer.objects.active
 
