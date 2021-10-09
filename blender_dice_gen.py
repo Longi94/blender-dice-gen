@@ -5,6 +5,7 @@ from mathutils import Vector, Matrix
 from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty
 from bpy_extras.object_utils import object_data_add
+from add_mesh_extra_objects.add_mesh_solid import createSolid, createPolys
 
 HALF_PI = math.pi / 2
 
@@ -32,7 +33,7 @@ class Mesh:
         verts = [Vector(i) for i in self.vertices]
 
         # turn n-gons in quads and tri's
-        faces = create_polys(self.faces)
+        faces = createPolys(self.faces)
 
         # generate object
         # Create new mesh
@@ -100,8 +101,8 @@ class Octahedron(Mesh):
 
         # calculate circumscribed sphere radius from inscribed sphere radius
         # diameter of the inscribed sphere is the face 2 face length of the octahedron
-        self.v_coord_const = (size * math.sqrt(3)) / 2
-        s = self.v_coord_const
+        self.circumscribed_r = (size * math.sqrt(3)) / 2
+        s = self.circumscribed_r
 
         # create the vertices and faces
         self.vertices = [(s, 0, 0), (-s, 0, 0), (0, s, 0), (0, -s, 0), (0, 0, s), (0, 0, -s)]
@@ -110,7 +111,7 @@ class Octahedron(Mesh):
         self.base_font_scale = 0.7
 
     def get_number_locations(self):
-        c = self.v_coord_const / 3
+        c = self.circumscribed_r / 3
         return [
             (c, c, c),
             (c, c, -c),
@@ -276,36 +277,6 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     return mesh_object
 
 
-def create_polys(poly):
-    """
-    this function creates a chain of quads and, when necessary, a remaining tri
-    for each polygon created in this script. be aware though, that this function
-    assumes each polygon is convex.
-
-    :param poly: list of faces, or a single face, like those needed for mesh.from_pydata.
-    :return: the tessellated faces.
-    """
-    # check for faces
-    if len(poly) == 0:
-        return []
-    # one or more faces
-    if type(poly[0]) == type(1):
-        poly = [poly]  # if only one,  make it a list of one face
-    faces = []
-    for i in poly:
-        L = len(i)
-        # let all faces of 3 or 4 verts be
-        if L < 5:
-            faces.append(i)
-        # split all polygons in half and bridge the two halves
-        else:
-            f = [[i[x], i[x + 1], i[L - 2 - x], i[L - 1 - x]] for x in range(L // 2 - 1)]
-            faces.extend(f)
-            if L & 1 == 1:
-                faces.append([i[L // 2 - 1 + x] for x in [0, 1, 2]])
-    return faces
-
-
 class D6Generator(bpy.types.Operator):
     """Generate a D6"""
     bl_idname = 'mesh.d6_add'
@@ -316,7 +287,7 @@ class D6Generator(bpy.types.Operator):
     base_font_scale = 1
 
     size: FloatProperty(
-        name='Size',
+        name='Face2face Length',
         description='Face-to-face size of the die',
         min=1,
         soft_min=1,
@@ -364,12 +335,12 @@ class D6Generator(bpy.types.Operator):
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        cube = Cube('d6', self.size)
-        cube.create(context)
+        die = Cube('d6', self.size)
+        die.create(context)
 
         # create number curves
         if self.add_numbers:
-            cube.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
 
         return {'FINISHED'}
 
@@ -384,7 +355,7 @@ class D8Generator(bpy.types.Operator):
     base_font_scale = 1
 
     size: FloatProperty(
-        name='Size',
+        name='Face2face Length',
         description='Face-to-face size of the die',
         min=1,
         soft_min=1,
@@ -432,12 +403,12 @@ class D8Generator(bpy.types.Operator):
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        octahedron = Octahedron('d8', self.size)
-        octahedron.create(context)
+        die = Octahedron('d8', self.size)
+        die.create(context)
 
         # create number curves
         if self.add_numbers:
-            octahedron.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
 
         return {'FINISHED'}
 
