@@ -768,9 +768,9 @@ def create_numbers(context, numbers, locations, rotations, font_path, font_size,
 
     # join the numbers into a single object
     if len(number_objs):
-        join(number_objs)
-        apply_transform(context.view_layer.objects.active, use_rotation=True)
-        return context.view_layer.objects.active
+        numbers = join(number_objs)
+        apply_transform(numbers, use_rotation=True)
+        return numbers
 
     return None
 
@@ -818,13 +818,12 @@ def create_number(context, number, font_path, font_size, number_depth, location,
                 (mesh_object.location.x, mesh_object.location.y - (mesh_object.dimensions.y / 2), 0))
 
             # join the bar to the number
-            join([mesh_object, bar_obj])
+            mesh_object = join([mesh_object, bar_obj])
 
             # recenter the mesh
             if center_bar:
                 set_origin_center_bounds(mesh_object)
 
-    bpy.context.view_layer.objects.active = mesh_object
     mesh_object.location.x = location[0]
     mesh_object.location.y = location[1]
     mesh_object.location.z = location[2]
