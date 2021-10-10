@@ -8,6 +8,18 @@ from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty
 from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createPolys
 
+bl_info = {
+    'name': 'Dice Gen',
+    'author': 'Long Tran',
+    'version': (1, 0, 0),
+    'blender': (2, 93, 0),
+    'location': 'View3D > Add > Mesh',
+    'description': 'Generate polyhedral dice models.',
+    'category': 'Add Mesh',
+    'doc_url': 'https://github.com/Longi94/blender-dice-gen/wiki',
+    'tracker_url': 'https://github.com/Longi94/blender-dice-gen/issues'
+}
+
 NUMBER_IND_NONE = 'none'
 NUMBER_IND_BAR = 'bar'
 NUMBER_IND_PERIOD = 'period'
@@ -61,16 +73,6 @@ CONSTANTS['pentagonal_trap']['angle'] = Euler((0, 0, acos(
             CONSTANTS['pentagonal_trap']['c1'], 2)))), 'XYZ')
 
 CONSTANTS['pentagonal_trap']['angle'].rotate(Euler((HALF_PI, 0, 0), 'XYZ'))
-
-bl_info = {
-    'name': 'Dice Gen',
-    'author': 'Long Tran',
-    'version': (0, 1, 0),
-    'blender': (2, 93, 0),
-    'location': 'View3D > Add > Mesh',
-    'description': 'Generate dice meshes',
-    'category': 'Add Mesh',
-}
 
 
 class Mesh:
