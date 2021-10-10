@@ -4,9 +4,13 @@ import os
 from math import sqrt, acos, pow
 from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
-from bpy.props import FloatProperty, BoolProperty, StringProperty
+from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty
 from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createSolid, createPolys
+
+NUMBER_IND_NONE = 'none'
+NUMBER_IND_BAR = 'bar'
+NUMBER_IND_PERIOD = 'period'
 
 HALF_PI = math.pi / 2
 
@@ -106,17 +110,19 @@ class Mesh:
     def get_number_rotations(self):
         return []
 
-    def create_numbers(self, context, size, number_scale, number_depth, font_path):
+    def create_numbers(self, context, size, number_scale, number_depth, font_path,
+                       number_indicator_type=NUMBER_IND_NONE, period_indicator_scale=1, period_indicator_space=1):
         numbers = self.get_numbers()
         locations = self.get_number_locations()
         rotations = self.get_number_rotations()
 
         font_size = self.base_font_scale * size * number_scale
 
-        numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth)
+        numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth,
+                                        number_indicator_type, period_indicator_scale, period_indicator_space)
 
-        if numbers_object is not None:
-            apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+        # if numbers_object is not None:
+        #     apply_boolean_modifier(context, self.dice_mesh, numbers_object)
 
 
 class Tetrahedron(Mesh):
@@ -322,7 +328,7 @@ class Dodecahedron(Mesh):
         angles[4].rotate(Euler((-math.radians(108), 0, 0), 'XYZ'))
         angles[4].rotate(Euler((0, 0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / -2), 'XYZ'))
 
-        angles[5].y = -HALF_PI
+        angles[5].y = HALF_PI
         angles[5].rotate(Euler((-math.radians(72), 0, 0), 'XYZ'))
         angles[5].rotate(Euler((0, 0, (math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2), 'XYZ'))
 
@@ -335,6 +341,7 @@ class Dodecahedron(Mesh):
         angles[7].rotate(Euler((0, 0, -(math.pi - CONSTANTS['octahedron']['dihedral_angle']) / 2), 'XYZ'))
 
         angles[8].z = math.radians(-36)
+        angles[8].y = math.pi
         angles[8].rotate(Euler((CONSTANTS['octahedron']['dihedral_angle'] / 2, 0, 0), 'XYZ'))
 
         angles[9].x = math.pi
@@ -641,6 +648,7 @@ def join(objects):
     ctx['active_object'] = objects[0]
     ctx['selected_editable_objects'] = objects
     bpy.ops.object.join(ctx)
+    return objects[0]
 
 
 def validate_font_path(filepath):
@@ -673,51 +681,83 @@ def apply_boolean_modifier(context, body_object, numbers_object):
     bpy.context.object.modifiers[0].show_viewport = False
 
 
-def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth):
-    number_objs = []
-    # create the number meshes
-    for i in range(len(locations)):
-        number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
-                                      rotations[i])
-        number_objs.append(number_object)
-
-    # join the numbers into a single object
-    if len(number_objs):
-        join(number_objs)
-        apply_transform(context.view_layer.objects.active, use_rotation=True)
-        return context.view_layer.objects.active
-
-    return None
-
-
-def create_number(context, number, font_path, font_size, number_depth, location, rotation):
-    """
-    Create a number mesh that will be used in a boolean modifier
-    """
+def create_text_mesh(context, text, font_path, font_size, name):
     # load the font
     font = get_font(font_path)
 
     # create the text curve
-    font_curve = bpy.data.curves.new(type='FONT', name=f'number_{number}')
-    font_curve.body = str(number)
+    font_curve = bpy.data.curves.new(type='FONT', name=name)
+    font_curve.body = text
     font_curve.font = font
     font_curve.size = font_size
 
     # create object from curve
-    curve_obj = bpy.data.objects.new('temp_number', font_curve)
+    curve_obj = bpy.data.objects.new('temp_curve_obj', font_curve)
 
     # convert curve to mesh
     mesh = curve_obj.to_mesh().copy()
     curve_obj.to_mesh_clear()
     bpy.data.objects.remove(curve_obj)
     bpy.data.curves.remove(font_curve)
+    return object_data_add(context, mesh, operator=None)
 
+
+def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth, number_indicator_type,
+                   period_indicator_scale, period_indicator_space):
+    number_objs = []
+    # create the number meshes
+    for i in range(len(locations)):
+        number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
+                                      rotations[i], number_indicator_type, period_indicator_scale,
+                                      period_indicator_space)
+        number_objs.append(number_object)
+
+    # join the numbers into a single object
+    if len(number_objs):
+        # join(number_objs)
+        # apply_transform(context.view_layer.objects.active, use_rotation=True)
+        return context.view_layer.objects.active
+
+    return None
+
+
+def create_number(context, number, font_path, font_size, number_depth, location, rotation, number_indicator_type,
+                  period_indicator_scale, period_indicator_space):
+    """
+    Create a number mesh that will be used in a boolean modifier
+    """
     # add number
-    mesh_object = object_data_add(context, mesh, operator=None)
+    mesh_object = create_text_mesh(context, number, font_path, font_size, f'number_{number}')
 
     # set origin to bounding box center
-    mesh_object.select_set(True)
+    bpy.context.view_layer.objects.active = mesh_object
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+
+    if number in ('6', '9'):
+        if number_indicator_type == NUMBER_IND_PERIOD:
+            p_obj = create_text_mesh(context, '.', font_path, font_size * period_indicator_scale, f'period_{number}')
+
+            # move origin of period to the bottom left corner of the mesh
+            bpy.context.view_layer.objects.active = p_obj
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+
+            new_origin = Vector((p_obj.location.x - (p_obj.dimensions.x / 2),
+                                 p_obj.location.y - (p_obj.dimensions.y / 2), 0))
+            bpy.context.scene.cursor.location = new_origin
+            bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='BOUNDS')
+            bpy.context.scene.cursor.location = Vector((0, 0, 0))
+
+            space = (1 / 20) * font_size * period_indicator_space
+
+            # move period to the bottom right of the number
+            p_obj.location = Vector((mesh_object.location.x + (mesh_object.dimensions.x / 2) + space,
+                                     mesh_object.location.y - (mesh_object.dimensions.y / 2), 0))
+
+            # join the period to the number
+            mesh_object = join([mesh_object, p_obj])
+            pass
+        elif number_indicator_type == NUMBER_IND_BAR:
+            pass
 
     mesh_object.location.x = location[0]
     mesh_object.location.y = location[1]
@@ -765,7 +805,7 @@ class D4Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -783,7 +823,7 @@ class D4Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
     )
 
     number_center_offset: FloatProperty(
@@ -842,7 +882,7 @@ class D6Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -860,7 +900,38 @@ class D6Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
+    )
+
+    number_indicator_type: EnumProperty(
+        name='Orientation Indicator',
+        items=(
+            (NUMBER_IND_NONE, 'None', ','),
+            (NUMBER_IND_BAR, 'Bar', ''),
+            (NUMBER_IND_PERIOD, 'Period', ''),
+        ),
+        default=NUMBER_IND_NONE,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+    period_indicator_scale: FloatProperty(
+        name='Period Scale',
+        description='Scale of the period orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    period_indicator_space: FloatProperty(
+        name='Period Space',
+        description='Space between the period orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
     )
 
     def execute(self, context):
@@ -873,7 +944,8 @@ class D6Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
 
         return {'FINISHED'}
 
@@ -908,7 +980,7 @@ class D8Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -926,7 +998,38 @@ class D8Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
+    )
+
+    number_indicator_type: EnumProperty(
+        name='Orientation Indicator',
+        items=(
+            (NUMBER_IND_NONE, 'None', ','),
+            (NUMBER_IND_BAR, 'Bar', ''),
+            (NUMBER_IND_PERIOD, 'Period', ''),
+        ),
+        default=NUMBER_IND_NONE,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+    period_indicator_scale: FloatProperty(
+        name='Period Scale',
+        description='Scale of the period orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    period_indicator_space: FloatProperty(
+        name='Period Space',
+        description='Space between the period orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
     )
 
     def execute(self, context):
@@ -939,7 +1042,8 @@ class D8Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
 
         return {'FINISHED'}
 
@@ -974,7 +1078,7 @@ class D12Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -992,7 +1096,38 @@ class D12Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
+    )
+
+    number_indicator_type: EnumProperty(
+        name='Orientation Indicator',
+        items=(
+            (NUMBER_IND_NONE, 'None', ','),
+            (NUMBER_IND_BAR, 'Bar', ''),
+            (NUMBER_IND_PERIOD, 'Period', ''),
+        ),
+        default=NUMBER_IND_PERIOD,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+    period_indicator_scale: FloatProperty(
+        name='Period Scale',
+        description='Scale of the period orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    period_indicator_space: FloatProperty(
+        name='Period Space',
+        description='Space between the period orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
     )
 
     def execute(self, context):
@@ -1005,7 +1140,8 @@ class D12Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
 
         return {'FINISHED'}
 
@@ -1040,7 +1176,7 @@ class D20Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -1058,7 +1194,38 @@ class D20Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
+    )
+
+    number_indicator_type: EnumProperty(
+        name='Orientation Indicator',
+        items=(
+            (NUMBER_IND_NONE, 'None', ','),
+            (NUMBER_IND_BAR, 'Bar', ''),
+            (NUMBER_IND_PERIOD, 'Period', ''),
+        ),
+        default=NUMBER_IND_PERIOD,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+    period_indicator_scale: FloatProperty(
+        name='Period Scale',
+        description='Scale of the period orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    period_indicator_space: FloatProperty(
+        name='Period Space',
+        description='Space between the period orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
     )
 
     def execute(self, context):
@@ -1071,7 +1238,8 @@ class D20Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
 
         return {'FINISHED'}
 
@@ -1101,7 +1269,7 @@ class D10Generator(bpy.types.Operator):
         soft_min=0.45,
         max=2,
         soft_max=2,
-        default=0.67,
+        default=2 / 3
     )
 
     add_numbers: BoolProperty(
@@ -1116,7 +1284,7 @@ class D10Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -1134,7 +1302,7 @@ class D10Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
     )
 
     number_v_offset: FloatProperty(
@@ -1147,6 +1315,37 @@ class D10Generator(bpy.types.Operator):
         default=0.35
     )
 
+    number_indicator_type: EnumProperty(
+        name='Orientation Indicator',
+        items=(
+            (NUMBER_IND_NONE, 'None', ','),
+            (NUMBER_IND_BAR, 'Bar', ''),
+            (NUMBER_IND_PERIOD, 'Period', ''),
+        ),
+        default=NUMBER_IND_PERIOD,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+    period_indicator_scale: FloatProperty(
+        name='Period Scale',
+        description='Scale of the period orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    period_indicator_space: FloatProperty(
+        name='Period Space',
+        description='Space between the period orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -1157,7 +1356,8 @@ class D10Generator(bpy.types.Operator):
 
         # create number curves
         if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
 
         return {'FINISHED'}
 
@@ -1187,7 +1387,7 @@ class D100Generator(bpy.types.Operator):
         soft_min=0.45,
         max=2,
         soft_max=2,
-        default=0.67,
+        default=2 / 3
     )
 
     add_numbers: BoolProperty(
@@ -1202,7 +1402,7 @@ class D100Generator(bpy.types.Operator):
         soft_min=0.1,
         max=2,
         soft_max=2,
-        default=1,
+        default=1
     )
 
     number_depth: FloatProperty(
@@ -1220,7 +1420,7 @@ class D100Generator(bpy.types.Operator):
         name='Font',
         description='Number font',
         maxlen=1024,
-        subtype='FILE_PATH',
+        subtype='FILE_PATH'
     )
 
     number_v_offset: FloatProperty(
