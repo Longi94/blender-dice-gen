@@ -111,7 +111,7 @@ class Mesh:
                                         center_bar)
 
         if numbers_object is not None:
-            apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+            apply_boolean_modifier(self.dice_mesh, numbers_object)
 
 
 class Tetrahedron(Mesh):
@@ -699,6 +699,7 @@ def join(objects):
     # one of the objects to join
     ctx['active_object'] = objects[0]
     ctx['selected_editable_objects'] = objects
+    # TODO apparently, ops calls trigger a viewport refresh, should find a way to replace with a low level join
     bpy.ops.object.join(ctx)
     return objects[0]
 
@@ -719,7 +720,7 @@ def get_font(filepath):
         return bpy.data.fonts['Bfont']
 
 
-def apply_boolean_modifier(context, body_object, numbers_object):
+def apply_boolean_modifier(body_object, numbers_object):
     """
     Add a BOOLEAN modifier to body_object that targets
     :param context:
@@ -727,10 +728,9 @@ def apply_boolean_modifier(context, body_object, numbers_object):
     :param numbers_object
     :return:
     """
-    context.view_layer.objects.active = body_object
-    bpy.ops.object.modifier_add(type='BOOLEAN')
-    bpy.context.object.modifiers[0].object = bpy.data.objects[numbers_object.name]
-    bpy.context.object.modifiers[0].show_viewport = False
+    numbers_boolean = body_object.modifiers.new(type='BOOLEAN', name='boolean')
+    numbers_boolean.object = bpy.data.objects[numbers_object.name]
+    numbers_boolean.show_viewport = False
 
 
 def create_text_mesh(context, text, font_path, font_size, name):
@@ -834,9 +834,9 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     mesh_object.rotation_euler.z = rotation[2]
 
     # add solidify modifier
-    bpy.ops.object.modifier_add(type='SOLIDIFY')
-    context.object.modifiers[0].thickness = 2 * number_depth
-    context.object.modifiers[0].offset = 0
+    solidify = mesh_object.modifiers.new(type='SOLIDIFY', name=f'solidify_{number}')
+    solidify.thickness = 2 * number_depth
+    solidify.offset = 0
 
     return mesh_object
 
