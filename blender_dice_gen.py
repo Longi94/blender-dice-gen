@@ -6,7 +6,7 @@ from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty
 from bpy_extras.object_utils import object_data_add
-from add_mesh_extra_objects.add_mesh_solid import createSolid, createPolys
+from add_mesh_extra_objects.add_mesh_solid import createPolys
 
 NUMBER_IND_NONE = 'none'
 NUMBER_IND_BAR = 'bar'
@@ -83,22 +83,7 @@ class Mesh:
         self.base_font_scale = 1
 
     def create(self, context):
-        verts = [Vector(i) for i in self.vertices]
-
-        # turn n-gons in quads and tri's
-        faces = createPolys(self.faces)
-
-        # generate object
-        # Create new mesh
-        mesh = bpy.data.meshes.new(self.name)
-
-        # Make a mesh from a list of verts/edges/faces.
-        mesh.from_pydata(verts, [], faces)
-
-        # Update mesh geometry after adding stuff.
-        mesh.update()
-
-        self.dice_mesh = object_data_add(context, mesh, operator=None)
+        self.dice_mesh = create_mesh(context, self.vertices, self.faces, self.name)
         return self.dice_mesh
 
     def get_numbers(self):
@@ -111,7 +96,9 @@ class Mesh:
         return []
 
     def create_numbers(self, context, size, number_scale, number_depth, font_path,
-                       number_indicator_type=NUMBER_IND_NONE, period_indicator_scale=1, period_indicator_space=1):
+                       number_indicator_type=NUMBER_IND_NONE, period_indicator_scale=1, period_indicator_space=1,
+                       bar_indicator_height=1, bar_indicator_width=1, bar_indicator_space=1,
+                       center_bar=True):
         numbers = self.get_numbers()
         locations = self.get_number_locations()
         rotations = self.get_number_rotations()
@@ -119,10 +106,12 @@ class Mesh:
         font_size = self.base_font_scale * size * number_scale
 
         numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth,
-                                        number_indicator_type, period_indicator_scale, period_indicator_space)
+                                        number_indicator_type, period_indicator_scale, period_indicator_space,
+                                        bar_indicator_height, bar_indicator_width, bar_indicator_space,
+                                        center_bar)
 
-        # if numbers_object is not None:
-        #     apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+        if numbers_object is not None:
+            apply_boolean_modifier(context, self.dice_mesh, numbers_object)
 
 
 class Tetrahedron(Mesh):
@@ -600,6 +589,69 @@ class D100Mesh(SquashedPentagonalTrapezohedron):
         return [f'{str((i + 1) % 10)}0' for i in range(10)]
 
 
+def set_origin_center_bounds(o):
+    """
+    set an objects origin to the center of its bounding box
+    :param o:
+    :return:
+    """
+    me = o.data
+    mw = o.matrix_world
+
+    max_x = max((v.co.x for v in me.vertices))
+    max_y = max((v.co.y for v in me.vertices))
+    max_z = max((v.co.z for v in me.vertices))
+
+    min_x = min((v.co.x for v in me.vertices))
+    min_y = min((v.co.y for v in me.vertices))
+    min_z = min((v.co.z for v in me.vertices))
+
+    origin = Vector(((min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2))
+
+    T = Matrix.Translation(-origin)
+    me.transform(T)
+    mw.translation = mw @ origin
+
+
+def set_origin_min_bounds(o):
+    """
+    set an objects origin to the min corner of its bounding box
+    :param o:
+    :return:
+    """
+    me = o.data
+    mw = o.matrix_world
+
+    min_x = min((v.co.x for v in me.vertices))
+    min_y = min((v.co.y for v in me.vertices))
+    min_z = min((v.co.z for v in me.vertices))
+
+    origin = Vector((min_x, min_y, min_z))
+
+    T = Matrix.Translation(-origin)
+    me.transform(T)
+    mw.translation = mw @ origin
+
+
+def create_mesh(context, vertices, faces, name):
+    verts = [Vector(i) for i in vertices]
+
+    # turn n-gons in quads and tri's
+    faces = createPolys(faces)
+
+    # generate object
+    # Create new mesh
+    mesh = bpy.data.meshes.new(name)
+
+    # Make a mesh from a list of verts/edges/faces.
+    mesh.from_pydata(verts, [], faces)
+
+    # Update mesh geometry after adding stuff.
+    mesh.update()
+
+    return object_data_add(context, mesh, operator=None)
+
+
 def apply_transform(ob, use_location=False, use_rotation=False, use_scale=False):
     """
     https://blender.stackexchange.com/questions/159538/how-to-apply-all-transformations-to-an-object-at-low-level
@@ -703,26 +755,29 @@ def create_text_mesh(context, text, font_path, font_size, name):
 
 
 def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth, number_indicator_type,
-                   period_indicator_scale, period_indicator_space):
+                   period_indicator_scale, period_indicator_space, bar_indicator_height, bar_indicator_width,
+                   bar_indicator_space, center_bar):
     number_objs = []
     # create the number meshes
     for i in range(len(locations)):
         number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
                                       rotations[i], number_indicator_type, period_indicator_scale,
-                                      period_indicator_space)
+                                      period_indicator_space, bar_indicator_height, bar_indicator_width,
+                                      bar_indicator_space, center_bar)
         number_objs.append(number_object)
 
     # join the numbers into a single object
     if len(number_objs):
-        # join(number_objs)
-        # apply_transform(context.view_layer.objects.active, use_rotation=True)
+        join(number_objs)
+        apply_transform(context.view_layer.objects.active, use_rotation=True)
         return context.view_layer.objects.active
 
     return None
 
 
 def create_number(context, number, font_path, font_size, number_depth, location, rotation, number_indicator_type,
-                  period_indicator_scale, period_indicator_space):
+                  period_indicator_scale, period_indicator_space, bar_indicator_height, bar_indicator_width,
+                  bar_indicator_space, center_bar):
     """
     Create a number mesh that will be used in a boolean modifier
     """
@@ -730,22 +785,14 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     mesh_object = create_text_mesh(context, number, font_path, font_size, f'number_{number}')
 
     # set origin to bounding box center
-    bpy.context.view_layer.objects.active = mesh_object
-    bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+    set_origin_center_bounds(mesh_object)
 
     if number in ('6', '9'):
         if number_indicator_type == NUMBER_IND_PERIOD:
             p_obj = create_text_mesh(context, '.', font_path, font_size * period_indicator_scale, f'period_{number}')
 
             # move origin of period to the bottom left corner of the mesh
-            bpy.context.view_layer.objects.active = p_obj
-            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-
-            new_origin = Vector((p_obj.location.x - (p_obj.dimensions.x / 2),
-                                 p_obj.location.y - (p_obj.dimensions.y / 2), 0))
-            bpy.context.scene.cursor.location = new_origin
-            bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='BOUNDS')
-            bpy.context.scene.cursor.location = Vector((0, 0, 0))
+            set_origin_min_bounds(p_obj)
 
             space = (1 / 20) * font_size * period_indicator_space
 
@@ -755,10 +802,29 @@ def create_number(context, number, font_path, font_size, number_depth, location,
 
             # join the period to the number
             mesh_object = join([mesh_object, p_obj])
-            pass
         elif number_indicator_type == NUMBER_IND_BAR:
-            pass
+            # create a simple rectangle
+            bar_width = mesh_object.dimensions.x * bar_indicator_width
+            bar_height = (1 / 15) * font_size * bar_indicator_height
+            bar_space = (1 / 20) * font_size * bar_indicator_space
+            bar_obj = create_mesh(context, [(-bar_width / 2, -bar_space, 0),
+                                            (bar_width / 2, -bar_space, 0),
+                                            (-bar_width / 2, -bar_space - bar_height, 0),
+                                            (bar_width / 2, -bar_space - bar_height, 0)],
+                                  [[0, 1, 3, 2]], 'bar_indicator')
 
+            # move bar below the number
+            bar_obj.location = Vector(
+                (mesh_object.location.x, mesh_object.location.y - (mesh_object.dimensions.y / 2), 0))
+
+            # join the bar to the number
+            join([mesh_object, bar_obj])
+
+            # recenter the mesh
+            if center_bar:
+                set_origin_center_bounds(mesh_object)
+
+    bpy.context.view_layer.objects.active = mesh_object
     mesh_object.location.x = location[0]
     mesh_object.location.y = location[1]
     mesh_object.location.z = location[2]
@@ -934,6 +1000,42 @@ class D6Generator(bpy.types.Operator):
         default=1
     )
 
+    bar_indicator_height: FloatProperty(
+        name='Bar Height',
+        description='Height scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    bar_indicator_width: FloatProperty(
+        name='Bar Width',
+        description='Width scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    bar_indicator_space: FloatProperty(
+        name='Bar Space',
+        description='Space between the bar orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    center_bar: BoolProperty(
+        name='Center Align Bar',
+        description='If true, the bar indicator is included in the vertical alignment of the number',
+        default=True
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -945,7 +1047,9 @@ class D6Generator(bpy.types.Operator):
         # create number curves
         if self.add_numbers:
             die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
+                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
+                               self.center_bar)
 
         return {'FINISHED'}
 
@@ -1032,6 +1136,42 @@ class D8Generator(bpy.types.Operator):
         default=1
     )
 
+    bar_indicator_height: FloatProperty(
+        name='Bar Height',
+        description='Height scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    bar_indicator_width: FloatProperty(
+        name='Bar Width',
+        description='Width scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    bar_indicator_space: FloatProperty(
+        name='Bar Space',
+        description='Space between the bar orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    center_bar: BoolProperty(
+        name='Center Align Bar',
+        description='If true, the bar indicator is included in the vertical alignment of the number',
+        default=True
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -1043,7 +1183,9 @@ class D8Generator(bpy.types.Operator):
         # create number curves
         if self.add_numbers:
             die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
+                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
+                               self.center_bar)
 
         return {'FINISHED'}
 
@@ -1130,6 +1272,42 @@ class D12Generator(bpy.types.Operator):
         default=1
     )
 
+    bar_indicator_height: FloatProperty(
+        name='Bar Height',
+        description='Height scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    bar_indicator_width: FloatProperty(
+        name='Bar Width',
+        description='Width scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    bar_indicator_space: FloatProperty(
+        name='Bar Space',
+        description='Space between the bar orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    center_bar: BoolProperty(
+        name='Center Align Bar',
+        description='If true, the bar indicator is included in the vertical alignment of the number',
+        default=True
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -1141,7 +1319,9 @@ class D12Generator(bpy.types.Operator):
         # create number curves
         if self.add_numbers:
             die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
+                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
+                               self.center_bar)
 
         return {'FINISHED'}
 
@@ -1228,6 +1408,42 @@ class D20Generator(bpy.types.Operator):
         default=1
     )
 
+    bar_indicator_height: FloatProperty(
+        name='Bar Height',
+        description='Height scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    bar_indicator_width: FloatProperty(
+        name='Bar Width',
+        description='Width scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    bar_indicator_space: FloatProperty(
+        name='Bar Space',
+        description='Space between the bar orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    center_bar: BoolProperty(
+        name='Center Align Bar',
+        description='If true, the bar indicator is included in the vertical alignment of the number',
+        default=True
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -1239,7 +1455,9 @@ class D20Generator(bpy.types.Operator):
         # create number curves
         if self.add_numbers:
             die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
+                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
+                               self.center_bar)
 
         return {'FINISHED'}
 
@@ -1346,6 +1564,42 @@ class D10Generator(bpy.types.Operator):
         default=1
     )
 
+    bar_indicator_height: FloatProperty(
+        name='Bar Height',
+        description='Height scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    bar_indicator_width: FloatProperty(
+        name='Bar Width',
+        description='Width scale of the bar orientation indicator',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    bar_indicator_space: FloatProperty(
+        name='Bar Space',
+        description='Space between the bar orientation indicator and the number',
+        min=0,
+        soft_min=0,
+        max=3,
+        soft_max=3,
+        default=1
+    )
+
+    center_bar: BoolProperty(
+        name='Center Align Bar',
+        description='If true, the bar indicator is included in the vertical alignment of the number',
+        default=True
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
@@ -1357,7 +1611,9 @@ class D10Generator(bpy.types.Operator):
         # create number curves
         if self.add_numbers:
             die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space)
+                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
+                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
+                               self.center_bar)
 
         return {'FINISHED'}
 
