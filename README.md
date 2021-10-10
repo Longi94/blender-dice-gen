@@ -15,6 +15,8 @@ The add-on will create 2 objects, a blank dice mesh and the numbers. The blank d
 - D4 Tetrahedron
 - D6 Cube
 - D8 Octahedron
+- D10 Pentagonal Trepazohedron
+- D100 Pentagonal Trepazohedron
 - D12 Dodecahedron
 - D20 Icosahedron
 
@@ -22,8 +24,6 @@ Dice TODO
 
 - D4 Crystal
 - D4 Shard
-- D10 Deltohedron
-- D100 Deltohedron
 
 ## Tips
 

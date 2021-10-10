@@ -1,7 +1,7 @@
 import math
 import bpy
 import os
-from math import sqrt, acos
+from math import sqrt, acos, pow
 from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty
@@ -9,6 +9,12 @@ from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createSolid, createPolys
 
 HALF_PI = math.pi / 2
+
+
+def leg_b(leg_a, h):
+    """given a leg of a right angle triangle and it's height, calculate the other leg"""
+    return sqrt(pow(h, 2) + (pow(h, 4) / (pow(leg_a, 2) - pow(h, 2))))
+
 
 # https://dmccooey.com/polyhedra
 CONSTANTS = {
@@ -31,8 +37,26 @@ CONSTANTS = {
         'inscribed_r': (3 * sqrt(3) + sqrt(15)) / 12,
         'c0': (1 + sqrt(5)) / 4,
         'c1': 0.5
+    },
+    'pentagonal_trap': {
+        'inscribed_r': sqrt(5 * (5 + 2 * sqrt(5))) / 10,
+        'base_height': 1.1180340051651,
+        'base_width': leg_b(1.1180340051651, 0.5),
+        'c0': (sqrt(5) - 1) / 4,
+        'c1': (1 + sqrt(5)) / 4,
+        'c2': (3 + sqrt(5)) / 4,
+        'c3': 0.5
     }
 }
+
+# calculate rotation of trapezohedron to have it stand upright
+# from dice-gen Math.acos((C0 - C2) / Math.sqrt(Math.pow(C0 - C2, 2) + 4 * Math.pow(C1, 2)))
+CONSTANTS['pentagonal_trap']['angle'] = Euler((0, 0, acos(
+    (CONSTANTS['pentagonal_trap']['c0'] - CONSTANTS['pentagonal_trap']['c2']) / sqrt(
+        pow(CONSTANTS['pentagonal_trap']['c0'] - CONSTANTS['pentagonal_trap']['c2'], 2) + 4 * pow(
+            CONSTANTS['pentagonal_trap']['c1'], 2)))), 'XYZ')
+
+CONSTANTS['pentagonal_trap']['angle'].rotate(Euler((HALF_PI, 0, 0), 'XYZ'))
 
 bl_info = {
     'name': 'Dice Gen',
@@ -91,7 +115,8 @@ class Mesh:
 
         numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth)
 
-        apply_boolean_modifier(context, self.dice_mesh, numbers_object)
+        if numbers_object is not None:
+            apply_boolean_modifier(context, self.dice_mesh, numbers_object)
 
 
 class Tetrahedron(Mesh):
@@ -468,6 +493,105 @@ class Icosahedron(Mesh):
         return [(a.x, a.y, a.z) for a in angles]
 
 
+class SquashedPentagonalTrapezohedron(Mesh):
+
+    def __init__(self, name, size, height):
+        super().__init__(name)
+        self.size = size
+        self.height = height
+
+        antiprism_e = size / 2 / CONSTANTS['pentagonal_trap']['inscribed_r']
+
+        c0 = CONSTANTS['pentagonal_trap']['c0'] * antiprism_e
+        c1 = CONSTANTS['pentagonal_trap']['c1'] * antiprism_e
+        c2 = CONSTANTS['pentagonal_trap']['c2'] * antiprism_e
+        c3 = CONSTANTS['pentagonal_trap']['c3'] * antiprism_e
+
+        scaled_base_height = CONSTANTS['pentagonal_trap']['base_height'] * size
+        scaled_base_width = CONSTANTS['pentagonal_trap']['base_width'] * size
+
+        scaled_height = scaled_base_height * height
+        scaled_width = leg_b(scaled_height, size / 2)
+        width = scaled_width / scaled_base_width
+
+        # TODO figure out where this angle comes from
+        self.vertices = [(0.0, c0, c1), (0.0, c0, -c1), (0.0, -c0, c1), (0.0, -c0, -c1), (c3, c3, c3), (c3, c3, -c3),
+                         (-c3, -c3, c3), (-c3, -c3, -c3), (c2, -c1, 0.0), (-c2, c1, 0.0), (c0, c1, 0.0),
+                         (-c0, -c1, 0.0)]
+
+        def transform(v):
+            # rotate the vectors, so the trapezohedron is up right
+            vector = Vector(v)
+            vector.rotate(CONSTANTS['pentagonal_trap']['angle'])
+
+            # scale the body
+            vector.z *= height
+            vector.y *= width
+            vector.x *= width
+            return vector.x, vector.y, vector.z
+
+        self.vertices = list(map(transform, self.vertices))
+
+        self.faces = [[8, 2, 6, 11], [8, 11, 7, 3], [8, 3, 1, 5], [8, 5, 10, 4], [8, 4, 0, 2], [9, 0, 4, 10],
+                      [9, 10, 5, 1], [9, 1, 3, 7], [9, 7, 11, 6], [9, 6, 2, 0]]
+
+    def get_number_locations(self):
+        vectors = [Vector(v) for v in self.vertices]
+
+        lerp_factor = 0.35
+        location_vectors = [
+            vectors[6].lerp(vectors[8], lerp_factor),
+            vectors[3].lerp(vectors[9], lerp_factor),
+            vectors[1].lerp(vectors[8], lerp_factor),
+            vectors[4].lerp(vectors[9], lerp_factor),
+            vectors[10].lerp(vectors[8], lerp_factor),
+            vectors[11].lerp(vectors[9], lerp_factor),
+            vectors[7].lerp(vectors[8], lerp_factor),
+            vectors[2].lerp(vectors[9], lerp_factor),
+            vectors[0].lerp(vectors[8], lerp_factor),
+            vectors[5].lerp(vectors[9], lerp_factor)
+        ]
+
+        return [(v.x, v.y, v.z) for v in location_vectors]
+
+    def get_number_rotations(self):
+        a = Vector(self.vertices[9])
+        b = Vector(self.vertices[10]) - Vector(self.vertices[8])
+        number_angle = HALF_PI - a.angle(b)
+        return [
+            (number_angle, 0, -HALF_PI - math.pi * 6 / 5),
+            (math.pi + number_angle, 0, -HALF_PI - math.pi * 8 / 5),
+            (number_angle, 0, -HALF_PI - math.pi * 2 / 5),
+            (math.pi + number_angle, 0, -HALF_PI - math.pi * 4 / 5),
+            (number_angle, 0, -HALF_PI),
+            (math.pi + number_angle, 0, -HALF_PI),
+            (number_angle, 0, -HALF_PI - math.pi * 4 / 5),
+            (math.pi + number_angle, 0, -HALF_PI - math.pi * 2 / 5),
+            (number_angle, 0, -HALF_PI - math.pi * 8 / 5),
+            (math.pi + number_angle, 0, -HALF_PI - math.pi * 6 / 5)
+        ]
+
+
+class D10Mesh(SquashedPentagonalTrapezohedron):
+
+    def __init__(self, name, size, height):
+        super().__init__(name, size, height)
+        self.base_font_scale = 0.6
+
+    def get_numbers(self):
+        return [str((i + 1) % 10) for i in range(10)]
+
+
+class D100Mesh(SquashedPentagonalTrapezohedron):
+
+    def __init__(self, name, size, height):
+        super().__init__(name, size, height)
+        self.base_font_scale = 0.45
+
+    def get_numbers(self):
+        return [f'{str((i + 1) % 10)}0' for i in range(10)]
+
+
 def apply_transform(ob, use_location=False, use_rotation=False, use_scale=False):
     """
     https://blender.stackexchange.com/questions/159538/how-to-apply-all-transformations-to-an-object-at-low-level
@@ -557,9 +681,12 @@ def create_numbers(context, numbers, locations, rotations, font_path, font_size,
         number_objs.append(number_object)
 
     # join the numbers into a single object
-    join(number_objs)
-    apply_transform(context.view_layer.objects.active, use_rotation=True)
-    return context.view_layer.objects.active
+    if len(number_objs):
+        join(number_objs)
+        apply_transform(context.view_layer.objects.active, use_rotation=True)
+        return context.view_layer.objects.active
+
+    return None
 
 
 def create_number(context, number, font_path, font_size, number_depth, location, rotation):
@@ -610,7 +737,7 @@ def create_number(context, number, font_path, font_size, number_depth, location,
 class D4Generator(bpy.types.Operator):
     """Generate a D4"""
     bl_idname = 'mesh.d4_add'
-    bl_label = 'D4'
+    bl_label = 'D4 Tetrahedron'
     bl_description = 'Generate a tetrahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -687,7 +814,7 @@ class D4Generator(bpy.types.Operator):
 class D6Generator(bpy.types.Operator):
     """Generate a D6"""
     bl_idname = 'mesh.d6_add'
-    bl_label = 'D6'
+    bl_label = 'D6 Cube'
     bl_description = 'Generate a cube dice'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -753,7 +880,7 @@ class D6Generator(bpy.types.Operator):
 class D8Generator(bpy.types.Operator):
     """Generate a D8"""
     bl_idname = 'mesh.d8_add'
-    bl_label = 'D8'
+    bl_label = 'D8 Octahedron'
     bl_description = 'Generate a octahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -819,7 +946,7 @@ class D8Generator(bpy.types.Operator):
 class D12Generator(bpy.types.Operator):
     """Generate a D12"""
     bl_idname = 'mesh.d12_add'
-    bl_label = 'D12'
+    bl_label = 'D12 Dodecahedron'
     bl_description = 'Generate a dodecahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -885,7 +1012,7 @@ class D12Generator(bpy.types.Operator):
 class D20Generator(bpy.types.Operator):
     """Generate a D20"""
     bl_idname = 'mesh.d20_add'
-    bl_label = 'D20'
+    bl_label = 'D20 Icosahedron'
     bl_description = 'Generate an icosahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -948,6 +1075,158 @@ class D20Generator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class D10Generator(bpy.types.Operator):
+    """Generate a D10"""
+    bl_idname = 'mesh.d10_add'
+    bl_label = 'D10 Trapezohedron'
+    bl_description = 'Generate an d10 trapezohedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    size: FloatProperty(
+        name='Face2face Length',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=17,
+        unit='LENGTH'
+    )
+
+    height: FloatProperty(
+        name='Dice Height',
+        description='Height of the die',
+        min=0.45,
+        soft_min=0.45,
+        max=2,
+        soft_max=2,
+        default=0.67,
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        die = D10Mesh('d10', self.size, self.height)
+        die.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+
+        return {'FINISHED'}
+
+
+class D100Generator(bpy.types.Operator):
+    """Generate a D100"""
+    bl_idname = 'mesh.d100_add'
+    bl_label = 'D100 Trapezohedron'
+    bl_description = 'Generate an d100 trapezohedron dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    size: FloatProperty(
+        name='Face2face Length',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=17,
+        unit='LENGTH'
+    )
+
+    height: FloatProperty(
+        name='Dice Height',
+        description='Height of the die',
+        min=0.45,
+        soft_min=0.45,
+        max=2,
+        soft_max=2,
+        default=0.67,
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1,
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH',
+    )
+
+    def execute(self, context):
+        # set font to emtpy if it's not a ttf file
+        self.font_path = validate_font_path(self.font_path)
+
+        # create the cube mesh
+        die = D100Mesh('d100', self.size, self.height)
+        die.create(context)
+
+        # create number curves
+        if self.add_numbers:
+            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+
+        return {'FINISHED'}
+
+
 class MeshDiceAdd(Menu):
     """
     Dice menu under "Add Mesh"
@@ -962,6 +1241,8 @@ class MeshDiceAdd(Menu):
         layout.operator('mesh.d4_add', text='D4 Tetrahedron')
         layout.operator('mesh.d6_add', text='D6 Cube')
         layout.operator('mesh.d8_add', text='D8 Octahedron')
+        layout.operator('mesh.d10_add', text='D10 Trapezohedron')
+        layout.operator('mesh.d100_add', text='D100 Trapezohedron')
         layout.operator('mesh.d12_add', text='D12 Dodecahedron')
         layout.operator('mesh.d20_add', text='D20 Icosahedron')
 
@@ -980,6 +1261,8 @@ classes = [
     D4Generator,
     D6Generator,
     D8Generator,
+    D10Generator,
+    D100Generator,
     D12Generator,
     D20Generator
 ]
