@@ -495,10 +495,11 @@ class Icosahedron(Mesh):
 
 class SquashedPentagonalTrapezohedron(Mesh):
 
-    def __init__(self, name, size, height):
+    def __init__(self, name, size, height, number_v_offset):
         super().__init__(name)
         self.size = size
         self.height = height
+        self.number_v_offset = number_v_offset
 
         antiprism_e = size / 2 / CONSTANTS['pentagonal_trap']['inscribed_r']
 
@@ -538,7 +539,7 @@ class SquashedPentagonalTrapezohedron(Mesh):
     def get_number_locations(self):
         vectors = [Vector(v) for v in self.vertices]
 
-        lerp_factor = 0.35
+        lerp_factor = self.number_v_offset
         location_vectors = [
             vectors[6].lerp(vectors[8], lerp_factor),
             vectors[3].lerp(vectors[9], lerp_factor),
@@ -574,8 +575,8 @@ class SquashedPentagonalTrapezohedron(Mesh):
 
 class D10Mesh(SquashedPentagonalTrapezohedron):
 
-    def __init__(self, name, size, height):
-        super().__init__(name, size, height)
+    def __init__(self, name, size, height, number_v_offset):
+        super().__init__(name, size, height, number_v_offset)
         self.base_font_scale = 0.6
 
     def get_numbers(self):
@@ -584,8 +585,8 @@ class D10Mesh(SquashedPentagonalTrapezohedron):
 
 class D100Mesh(SquashedPentagonalTrapezohedron):
 
-    def __init__(self, name, size, height):
-        super().__init__(name, size, height)
+    def __init__(self, name, size, height, number_v_offset):
+        super().__init__(name, size, height, number_v_offset)
         self.base_font_scale = 0.45
 
     def get_numbers(self):
@@ -1136,12 +1137,22 @@ class D10Generator(bpy.types.Operator):
         subtype='FILE_PATH',
     )
 
+    number_v_offset: FloatProperty(
+        name='Number V Offset',
+        description='Vertical offset of the number positioning',
+        min=0.0,
+        soft_min=0.0,
+        max=1,
+        soft_max=1,
+        default=0.35
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        die = D10Mesh('d10', self.size, self.height)
+        die = D10Mesh('d10', self.size, self.height, self.number_v_offset)
         die.create(context)
 
         # create number curves
@@ -1212,12 +1223,22 @@ class D100Generator(bpy.types.Operator):
         subtype='FILE_PATH',
     )
 
+    number_v_offset: FloatProperty(
+        name='Number V Offset',
+        description='Vertical offset of the number positioning',
+        min=0.0,
+        soft_min=0.0,
+        max=1,
+        soft_max=1,
+        default=0.35
+    )
+
     def execute(self, context):
         # set font to emtpy if it's not a ttf file
         self.font_path = validate_font_path(self.font_path)
 
         # create the cube mesh
-        die = D100Mesh('d100', self.size, self.height)
+        die = D100Mesh('d100', self.size, self.height, self.number_v_offset)
         die.create(context)
 
         # create number curves
