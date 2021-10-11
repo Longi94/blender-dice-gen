@@ -206,6 +206,39 @@ class D4Crystal(Mesh):
         return [(HALF_PI, 0, HALF_PI), (HALF_PI, 0, HALF_PI * 2), (HALF_PI, 0, 0), (HALF_PI, 0, HALF_PI * 3)]
 
 
+class D4Shard(Mesh):
+
+    def __init__(self, name, size, top_point_height, bottom_point_height, number_v_offset):
+        super().__init__(name)
+        self.size = size
+        self.number_v_offset = number_v_offset
+        self.bottom_point_height = bottom_point_height
+
+        c0 = size / sqrt(2)
+        c1 = top_point_height * c0
+        c2 = bottom_point_height * c0
+
+        self.vertices = [(c0, 0, 0), (0, c0, 0), (0, -c0, 0), (-c0, 0, 0), (0, 0, c1), (0, 0, -c2)]
+        self.faces = [[0, 1, 4], [1, 3, 4], [3, 2, 4], [2, 0, 4], [0, 1, 5], [1, 3, 5], [3, 2, 5], [2, 0, 5]]
+
+        self.base_font_scale = 0.8
+
+    def get_numbers(self):
+        return numbers(4)
+
+    def get_number_locations(self):
+        c0 = self.size / 2 / sqrt(2) * self.number_v_offset
+        c1 = self.size / sqrt(2) * self.bottom_point_height * (1 - self.number_v_offset)
+        return [(c0, c0, -c1), (-c0, c0, -c1), (c0, -c0, -c1), (-c0, -c0, -c1)]
+
+    def get_number_rotations(self):
+        c0 = self.size / 2 / sqrt(2)
+        c1 = self.size / sqrt(2) * self.bottom_point_height
+        angle = math.pi / 2 + Vector((0, 0, c1)).angle(Vector((c0, c0, c1)))
+        return [(angle, 0, math.pi * 3 / 4), (angle, 0, math.pi * 5 / 4), (angle, 0, math.pi * 1 / 4),
+                (angle, 0, math.pi * 7 / 4)]
+
+
 class Cube(Mesh):
 
     def __init__(self, name, size):
@@ -966,8 +999,7 @@ class D4Generator(bpy.types.Operator):
         soft_min=0.0,
         max=1,
         soft_max=1,
-        default=0.5,
-        unit='LENGTH'
+        default=0.5
     )
 
     def execute(self, context):
@@ -1052,6 +1084,94 @@ class D4CrystalGenerator(bpy.types.Operator):
     def execute(self, context):
         return execute_generator(self, context, D4Crystal, 'd4Crystal', base_height=self.base_height,
                                  point_height=self.point_height)
+
+
+class D4ShardGenerator(bpy.types.Operator):
+    """Generate a D4 shard"""
+    bl_idname = 'mesh.d4_shard_add'
+    bl_label = 'D4 Shard'
+    bl_description = 'Generate a D4 crystal dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    number_indicator_type = NUMBER_IND_NONE
+
+    size: FloatProperty(
+        name='Edge2edge length',
+        description='Distance between 2 opposite horizontal edges',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=12,
+        unit='LENGTH'
+    )
+
+    top_point_height: FloatProperty(
+        name='Top Point Height',
+        description='Top point height of the die',
+        min=0.25,
+        soft_min=0.25,
+        max=2,
+        soft_max=2,
+        default=0.75
+    )
+
+    bottom_point_height: FloatProperty(
+        name='Bottom Point Height',
+        description='Bottom point height of the die',
+        min=0.25,
+        soft_min=0.25,
+        max=2.5,
+        soft_max=2.5,
+        default=1.75
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH'
+    )
+
+    number_v_offset: FloatProperty(
+        name='Number V Offset',
+        description='Vertical offset of the number positioning',
+        min=0.0,
+        soft_min=0.0,
+        max=1,
+        soft_max=1,
+        default=0.7
+    )
+
+    def execute(self, context):
+        return execute_generator(self, context, D4Shard, 'd4Shard', top_point_height=self.top_point_height,
+                                 bottom_point_height=self.bottom_point_height, number_v_offset=self.number_v_offset)
 
 
 class D6Generator(bpy.types.Operator):
@@ -1692,6 +1812,8 @@ class D100Generator(bpy.types.Operator):
     bl_description = 'Generate an d100 trapezohedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
+    number_indicator_type = NUMBER_IND_NONE
+
     size: FloatProperty(
         name='Face2face Length',
         description='Face-to-face size of the die',
@@ -1774,6 +1896,7 @@ class MeshDiceAdd(Menu):
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator('mesh.d4_add', text='D4 Tetrahedron')
         layout.operator('mesh.d4_crystal_add', text='D4 Crystal')
+        layout.operator('mesh.d4_shard_add', text='D4 Shard')
         layout.operator('mesh.d6_add', text='D6 Cube')
         layout.operator('mesh.d8_add', text='D8 Octahedron')
         layout.operator('mesh.d10_add', text='D10 Trapezohedron')
@@ -1795,6 +1918,7 @@ classes = [
     MeshDiceAdd,
     D4Generator,
     D4CrystalGenerator,
+    D4ShardGenerator,
     D6Generator,
     D8Generator,
     D10Generator,
