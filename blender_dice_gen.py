@@ -971,7 +971,7 @@ class D4Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        return execute_generator(self, context, Tetrahedron, 'd4')
+        return execute_generator(self, context, Tetrahedron, 'd4', number_center_offset=self.number_center_offset)
 
 
 class D4CrystalGenerator(bpy.types.Operator):
@@ -1681,7 +1681,8 @@ class D10Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        return execute_generator(self, context, D10Mesh, 'd10')
+        return execute_generator(self, context, D10Mesh, 'd10', height=self.height,
+                                 number_v_offset=self.number_v_offset)
 
 
 class D100Generator(bpy.types.Operator):
@@ -1756,7 +1757,8 @@ class D100Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        return execute_generator(self, context, D100Mesh, 'd100')
+        return execute_generator(self, context, D100Mesh, 'd100', height=self.height,
+                                 number_v_offset=self.number_v_offset)
 
 
 class MeshDiceAdd(Menu):
