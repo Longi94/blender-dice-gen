@@ -2,6 +2,8 @@
 
 A Blender add-on that generates polyhedral dice.
 
+![](https://github.com/Longi94/blender-dice-gen/raw/main/img/banner_ss.png)
+
 ## Installation and usage
 
 Download the [python script](https://github.com/Longi94/blender-dice-gen/releases), then go to `Edit > Preferences... > Add-ons > Install...` and select the python file.
@@ -9,6 +11,8 @@ Download the [python script](https://github.com/Longi94/blender-dice-gen/release
 Afterwards you will be able to generate dice in `Add > Mesh > Dice`
 
 The add-on will create 2 objects, a blank dice mesh and the numbers. The blank dice object will have a boolean modifier that has the "Realtime" flag turned off for performance reasons. Turn that on to see the result in the viewport.
+
+Go to the [wiki](https://github.com/Longi94/blender-dice-gen/wiki/Properties) to see what each property does in detail.
 
 ## Supported dice
 
