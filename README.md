@@ -29,3 +29,7 @@ Dice TODO
 
 - The unit scale in Blender is weird and with default settings the scale of the generated STL will be off by a factor of 1000 compared to the displayed scale in Blender. To have Blender display scales that matches the resulting STL set `Scene Properties > Units > Unit Scale` to 0.001. It also helps to set the length unit to millimeters.
 - If the dice disappears when enabling the boolean modifier, try ticking the `Self` option under the solver options for the Exact solver. Or try switching to the Fast solver.
+
+## Contributing
+
+Please make pull requests against the `dev` branch to keep the `master` branch clean.
