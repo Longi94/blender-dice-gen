@@ -593,6 +593,17 @@ class D100Mesh(SquashedPentagonalTrapezohedron):
         return [f'{str((i + 1) % 10)}0' for i in range(10)]
 
 
+def set_origin(o, v):
+    """
+    set origin to a specific location
+    """
+    me = o.data
+    mw = o.matrix_world
+    T = Matrix.Translation(-v)
+    me.transform(T)
+    mw.translation = mw @ v
+
+
 def set_origin_center_bounds(o):
     """
     set an objects origin to the center of its bounding box
@@ -600,7 +611,6 @@ def set_origin_center_bounds(o):
     :return:
     """
     me = o.data
-    mw = o.matrix_world
 
     max_x = max((v.co.x for v in me.vertices))
     max_y = max((v.co.y for v in me.vertices))
@@ -610,11 +620,7 @@ def set_origin_center_bounds(o):
     min_y = min((v.co.y for v in me.vertices))
     min_z = min((v.co.z for v in me.vertices))
 
-    origin = Vector(((min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2))
-
-    T = Matrix.Translation(-origin)
-    me.transform(T)
-    mw.translation = mw @ origin
+    set_origin(o, Vector(((min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2)))
 
 
 def set_origin_min_bounds(o):
@@ -624,18 +630,13 @@ def set_origin_min_bounds(o):
     :return:
     """
     me = o.data
-    mw = o.matrix_world
 
     max_z = max((v.co.z for v in me.vertices))
     min_x = min((v.co.x for v in me.vertices))
     min_y = min((v.co.y for v in me.vertices))
     min_z = min((v.co.z for v in me.vertices))
 
-    origin = Vector((min_x, min_y, (min_z + max_z) / 2))
-
-    T = Matrix.Translation(-origin)
-    me.transform(T)
-    mw.translation = mw @ origin
+    set_origin(o, Vector((min_x, min_y, (min_z + max_z) / 2)))
 
 
 def create_mesh(context, vertices, faces, name):
@@ -824,7 +825,7 @@ def create_number(context, number, font_path, font_size, number_depth, location,
                                    (bar_width / 2, -bar_space, -number_depth),
                                    (-bar_width / 2, -bar_space - bar_height, -number_depth),
                                    (bar_width / 2, -bar_space - bar_height, -number_depth)],
-                                  [[0, 1, 3, 2], [2, 3, 7, 6], [3, 1, 5, 7], [1, 0, 4, 5], [0, 2, 6, 4],[4, 6, 7, 5]],
+                                  [[0, 1, 3, 2], [2, 3, 7, 6], [3, 1, 5, 7], [1, 0, 4, 5], [0, 2, 6, 4], [4, 6, 7, 5]],
                                   'bar_indicator')
 
             # move bar below the number
