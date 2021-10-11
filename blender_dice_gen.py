@@ -86,6 +86,8 @@ class Mesh:
 
     def create(self, context):
         self.dice_mesh = create_mesh(context, self.vertices, self.faces, self.name)
+        # reset transforms
+        self.dice_mesh.matrix_world = Matrix()
         return self.dice_mesh
 
     def get_numbers(self):
@@ -774,7 +776,7 @@ def create_numbers(context, numbers, locations, rotations, font_path, font_size,
     # join the numbers into a single object
     if len(number_objs):
         numbers = join(number_objs)
-        apply_transform(numbers, use_rotation=True)
+        apply_transform(numbers, use_rotation=True, use_location=True)
         return numbers
 
     return None
