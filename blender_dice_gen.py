@@ -1799,7 +1799,7 @@ class D10Generator(bpy.types.Operator):
         soft_min=0.0,
         max=1,
         soft_max=1,
-        default=0.35
+        default=1 / 3
     )
 
     number_indicator_type: EnumProperty(
@@ -1955,7 +1955,7 @@ class D100Generator(bpy.types.Operator):
         soft_min=0.0,
         max=1,
         soft_max=1,
-        default=0.35
+        default=1 / 3
     )
 
     def execute(self, context):
