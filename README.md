@@ -8,7 +8,7 @@ Download the [python script](https://github.com/Longi94/blender-dice-gen/release
 
 Afterwards you will be able to generate dice in `Add > Mesh > Dice`
 
-The add-on will create 2 objects, a blank dice mesh and the numbers. The blank dice object will have a boolean modifier that that has the "Realtime" flag turned off for performance reasons. Turn that on to see the result in the viewport.
+The add-on will create 2 objects, a blank dice mesh and the numbers. The blank dice object will have a boolean modifier that has the "Realtime" flag turned off for performance reasons. Turn that on to see the result in the viewport.
 
 ## Supported dice
 
