@@ -12,6 +12,8 @@ The add-on will create 2 objects, a blank dice mesh and the numbers. The blank d
 
 ## Supported dice
 
+Create an issue if you'd like a new dice type to be added.
+
 - D4 Tetrahedron
 - D4 Crystal
 - D4 Shard
