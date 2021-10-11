@@ -617,18 +617,19 @@ def set_origin_center_bounds(o):
 
 def set_origin_min_bounds(o):
     """
-    set an objects origin to the min corner of its bounding box
+    set an objects origin to the bottom_left corner of its bounding box
     :param o:
     :return:
     """
     me = o.data
     mw = o.matrix_world
 
+    max_z = max((v.co.z for v in me.vertices))
     min_x = min((v.co.x for v in me.vertices))
     min_y = min((v.co.y for v in me.vertices))
     min_z = min((v.co.z for v in me.vertices))
 
-    origin = Vector((min_x, min_y, min_z))
+    origin = Vector((min_x, min_y, (min_z + max_z) / 2))
 
     T = Matrix.Translation(-origin)
     me.transform(T)
@@ -735,7 +736,7 @@ def apply_boolean_modifier(body_object, numbers_object):
     numbers_boolean.show_viewport = False
 
 
-def create_text_mesh(context, text, font_path, font_size, name):
+def create_text_mesh(context, text, font_path, font_size, name, extrude=0):
     # load the font
     font = get_font(font_path)
 
@@ -744,6 +745,8 @@ def create_text_mesh(context, text, font_path, font_size, name):
     font_curve.body = text
     font_curve.font = font
     font_curve.size = font_size
+    font_curve.extrude = extrude
+    font_curve.offset = 0
 
     # create object from curve
     curve_obj = bpy.data.objects.new('temp_curve_obj', font_curve)
@@ -784,14 +787,15 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     Create a number mesh that will be used in a boolean modifier
     """
     # add number
-    mesh_object = create_text_mesh(context, number, font_path, font_size, f'number_{number}')
+    mesh_object = create_text_mesh(context, number, font_path, font_size, f'number_{number}', number_depth)
 
     # set origin to bounding box center
     set_origin_center_bounds(mesh_object)
 
     if number in ('6', '9'):
         if number_indicator_type == NUMBER_IND_PERIOD:
-            p_obj = create_text_mesh(context, '.', font_path, font_size * period_indicator_scale, f'period_{number}')
+            p_obj = create_text_mesh(context, '.', font_path, font_size * period_indicator_scale, f'period_{number}',
+                                     number_depth)
 
             # move origin of period to the bottom left corner of the mesh
             set_origin_min_bounds(p_obj)
@@ -809,11 +813,17 @@ def create_number(context, number, font_path, font_size, number_depth, location,
             bar_width = mesh_object.dimensions.x * bar_indicator_width
             bar_height = (1 / 15) * font_size * bar_indicator_height
             bar_space = (1 / 20) * font_size * bar_indicator_space
-            bar_obj = create_mesh(context, [(-bar_width / 2, -bar_space, 0),
-                                            (bar_width / 2, -bar_space, 0),
-                                            (-bar_width / 2, -bar_space - bar_height, 0),
-                                            (bar_width / 2, -bar_space - bar_height, 0)],
-                                  [[0, 1, 3, 2]], 'bar_indicator')
+            bar_obj = create_mesh(context,
+                                  [(-bar_width / 2, -bar_space, number_depth),
+                                   (bar_width / 2, -bar_space, number_depth),
+                                   (-bar_width / 2, -bar_space - bar_height, number_depth),
+                                   (bar_width / 2, -bar_space - bar_height, number_depth),
+                                   (-bar_width / 2, -bar_space, -number_depth),
+                                   (bar_width / 2, -bar_space, -number_depth),
+                                   (-bar_width / 2, -bar_space - bar_height, -number_depth),
+                                   (bar_width / 2, -bar_space - bar_height, -number_depth)],
+                                  [[0, 1, 3, 2], [2, 3, 7, 6], [3, 1, 5, 7], [1, 0, 4, 5], [0, 2, 6, 4],[4, 6, 7, 5]],
+                                  'bar_indicator')
 
             # move bar below the number
             bar_obj.location = Vector(
@@ -834,10 +844,8 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     mesh_object.rotation_euler.y = rotation[1]
     mesh_object.rotation_euler.z = rotation[2]
 
-    # add solidify modifier
-    solidify = mesh_object.modifiers.new(type='SOLIDIFY', name=f'solidify_{number}')
-    solidify.thickness = 2 * number_depth
-    solidify.offset = 0
+    for f in mesh_object.data.polygons:
+        f.use_smooth = False
 
     return mesh_object
 
