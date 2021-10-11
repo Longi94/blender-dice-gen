@@ -100,7 +100,7 @@ class Mesh:
     def get_number_rotations(self):
         return []
 
-    def create_numbers(self, context, size, number_scale, number_depth, font_path,
+    def create_numbers(self, context, size, number_scale, number_depth, font_path, one_offset,
                        number_indicator_type=NUMBER_IND_NONE, period_indicator_scale=1, period_indicator_space=1,
                        bar_indicator_height=1, bar_indicator_width=1, bar_indicator_space=1,
                        center_bar=True):
@@ -113,7 +113,7 @@ class Mesh:
         numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth,
                                         number_indicator_type, period_indicator_scale, period_indicator_space,
                                         bar_indicator_height, bar_indicator_width, bar_indicator_space,
-                                        center_bar)
+                                        center_bar, one_offset)
 
         if numbers_object is not None:
             apply_boolean_modifier(self.dice_mesh, numbers_object)
@@ -665,7 +665,8 @@ def set_origin(o, v):
     """
     me = o.data
     mw = o.matrix_world
-    T = Matrix.Translation(-v)
+    current = o.location
+    T = Matrix.Translation(current - v)
     me.transform(T)
     mw.translation = mw @ v
 
@@ -830,14 +831,14 @@ def create_text_mesh(context, text, font_path, font_size, name, extrude=0):
 
 def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth, number_indicator_type,
                    period_indicator_scale, period_indicator_space, bar_indicator_height, bar_indicator_width,
-                   bar_indicator_space, center_bar):
+                   bar_indicator_space, center_bar, one_offset):
     number_objs = []
     # create the number meshes
     for i in range(len(locations)):
         number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
                                       rotations[i], number_indicator_type, period_indicator_scale,
                                       period_indicator_space, bar_indicator_height, bar_indicator_width,
-                                      bar_indicator_space, center_bar)
+                                      bar_indicator_space, center_bar, one_offset)
         number_objs.append(number_object)
 
     # join the numbers into a single object
@@ -851,7 +852,7 @@ def create_numbers(context, numbers, locations, rotations, font_path, font_size,
 
 def create_number(context, number, font_path, font_size, number_depth, location, rotation, number_indicator_type,
                   period_indicator_scale, period_indicator_space, bar_indicator_height, bar_indicator_width,
-                  bar_indicator_space, center_bar):
+                  bar_indicator_space, center_bar, one_offset):
     """
     Create a number mesh that will be used in a boolean modifier
     """
@@ -861,7 +862,14 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     # set origin to bounding box center
     set_origin_center_bounds(mesh_object)
 
-    if number in ('6', '9'):
+    if number == '1':
+        if one_offset > 0:
+            number_width = mesh_object.dimensions.x
+            new_origin = Vector((mesh_object.location.x + number_width * one_offset, mesh_object.location.y,
+                                 mesh_object.location.z))
+            set_origin(mesh_object, new_origin)
+            pass
+    elif number in ('6', '9'):
         if number_indicator_type == NUMBER_IND_PERIOD:
             p_obj = create_text_mesh(context, '.', font_path, font_size * period_indicator_scale, f'period_{number}',
                                      number_depth)
@@ -903,6 +911,7 @@ def create_number(context, number, font_path, font_size, number_depth, location,
 
             # recenter the mesh
             if center_bar:
+                mesh_object.location = Vector((0, 0, 0))
                 set_origin_center_bounds(mesh_object)
 
     mesh_object.location.x = location[0]
@@ -930,9 +939,9 @@ def execute_generator(op, context, mesh_cls, name, **kwargs):
     # create number curves
     if op.add_numbers:
         if op.number_indicator_type == NUMBER_IND_NONE:
-            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path)
+            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path, op.one_offset)
         else:
-            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path,
+            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path, op.one_offset,
                                op.number_indicator_type, op.period_indicator_scale, op.period_indicator_space,
                                op.bar_indicator_height, op.bar_indicator_width, op.bar_indicator_space, op.center_bar)
 
@@ -1000,6 +1009,16 @@ class D4Generator(bpy.types.Operator):
         max=1,
         soft_max=1,
         default=0.5
+    )
+
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
     )
 
     def execute(self, context):
@@ -1169,6 +1188,16 @@ class D4ShardGenerator(bpy.types.Operator):
         default=0.7
     )
 
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
+    )
+
     def execute(self, context):
         return execute_generator(self, context, D4Shard, 'd4Shard', top_point_height=self.top_point_height,
                                  bottom_point_height=self.bottom_point_height, number_v_offset=self.number_v_offset)
@@ -1290,6 +1319,16 @@ class D6Generator(bpy.types.Operator):
         name='Center Align Bar',
         description='If true, the bar indicator is included in the vertical alignment of the number',
         default=True
+    )
+
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
     )
 
     def execute(self, context):
@@ -1414,6 +1453,16 @@ class D8Generator(bpy.types.Operator):
         default=True
     )
 
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
+    )
+
     def execute(self, context):
         return execute_generator(self, context, Octahedron, 'd8')
 
@@ -1536,6 +1585,16 @@ class D12Generator(bpy.types.Operator):
         default=True
     )
 
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
+    )
+
     def execute(self, context):
         return execute_generator(self, context, Dodecahedron, 'd12')
 
@@ -1656,6 +1715,16 @@ class D20Generator(bpy.types.Operator):
         name='Center Align Bar',
         description='If true, the bar indicator is included in the vertical alignment of the number',
         default=True
+    )
+
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
     )
 
     def execute(self, context):
@@ -1800,6 +1869,16 @@ class D10Generator(bpy.types.Operator):
         default=True
     )
 
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
+    )
+
     def execute(self, context):
         return execute_generator(self, context, D10Mesh, 'd10', height=self.height,
                                  number_v_offset=self.number_v_offset)
@@ -1813,6 +1892,7 @@ class D100Generator(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     number_indicator_type = NUMBER_IND_NONE
+    one_offset = 0
 
     size: FloatProperty(
         name='Face2face Length',
