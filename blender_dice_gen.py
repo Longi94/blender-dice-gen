@@ -1,6 +1,7 @@
 import math
 import bpy
 import os
+from typing import List
 from math import sqrt, acos, pow
 from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
@@ -177,6 +178,34 @@ class Tetrahedron(Mesh):
         ]
 
 
+class D4Crystal(Mesh):
+
+    def __init__(self, name, size, base_height, point_height):
+        super().__init__(name)
+        self.size = size
+
+        c0 = 0.5 * size
+        c1 = 0.5 * base_height
+        c2 = 0.5 * base_height + point_height
+
+        self.vertices = [(-c0, -c0, c1), (c0, -c0, c1), (c0, c0, c1), (-c0, c0, c1), (-c0, -c0, -c1), (c0, -c0, -c1),
+                         (c0, c0, -c1), (-c0, c0, -c1), (0, 0, c2), (0, 0, -c2)]
+        self.faces = [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [0, 1, 8], [1, 2, 8], [2, 3, 8],
+                      [3, 0, 8], [4, 5, 9], [5, 6, 9], [6, 7, 9], [7, 4, 9]]
+
+        self.base_font_scale = 0.8
+
+    def get_numbers(self):
+        return numbers(4)
+
+    def get_number_locations(self):
+        c0 = 0.5 * self.size
+        return [(c0, 0, 0), (0, c0, 0), (0, -c0, 0), (-c0, 0, 0)]
+
+    def get_number_rotations(self):
+        return [(HALF_PI, 0, HALF_PI), (HALF_PI, 0, HALF_PI * 2), (HALF_PI, 0, 0), (HALF_PI, 0, HALF_PI * 3)]
+
+
 class Cube(Mesh):
 
     def __init__(self, name, size):
@@ -192,7 +221,7 @@ class Cube(Mesh):
         self.faces = [[0, 3, 2, 1], [0, 1, 5, 4], [0, 4, 7, 3], [6, 5, 1, 2], [6, 2, 3, 7], [6, 7, 4, 5]]
 
     def get_numbers(self):
-        return [str(i + 1) for i in range(6)]
+        return numbers(6)
 
     def get_number_locations(self):
         s = self.v_coord_const
@@ -226,7 +255,7 @@ class Octahedron(Mesh):
         self.base_font_scale = 0.7
 
     def get_numbers(self):
-        return [str(i + 1) for i in range(8)]
+        return numbers(8)
 
     def get_number_locations(self):
         c = self.circumscribed_r / 3
@@ -281,7 +310,7 @@ class Dodecahedron(Mesh):
         self.base_font_scale = 0.5
 
     def get_numbers(self):
-        return [str(i + 1) for i in range(12)]
+        return numbers(12)
 
     def get_number_locations(self):
         dual_e = self.size / 2 / CONSTANTS['icosahedron']['circumscribed_r']
@@ -373,7 +402,7 @@ class Icosahedron(Mesh):
         self.base_font_scale = 0.3
 
     def get_numbers(self):
-        return [str(i + 1) for i in range(20)]
+        return numbers(20)
 
     def get_number_locations(self):
         dual_e = self.size / 2 / CONSTANTS['octahedron']['circumscribed_r']
@@ -591,6 +620,10 @@ class D100Mesh(SquashedPentagonalTrapezohedron):
 
     def get_numbers(self):
         return [f'{str((i + 1) % 10)}0' for i in range(10)]
+
+
+def numbers(n: int) -> List[str]:
+    return [str(i + 1) for i in range(n)]
 
 
 def set_origin(o, v):
@@ -853,6 +886,26 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     return mesh_object
 
 
+def execute_generator(op, context, mesh_cls, name, **kwargs):
+    # set font to emtpy if it's not a ttf file
+    op.font_path = validate_font_path(op.font_path)
+
+    # create the cube mesh
+    die = mesh_cls(name, op.size, **kwargs)
+    die.create(context)
+
+    # create number curves
+    if op.add_numbers:
+        if op.number_indicator_type == NUMBER_IND_NONE:
+            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path)
+        else:
+            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path,
+                               op.number_indicator_type, op.period_indicator_scale, op.period_indicator_space,
+                               op.bar_indicator_height, op.bar_indicator_width, op.bar_indicator_space, op.center_bar)
+
+    return {'FINISHED'}
+
+
 class D4Generator(bpy.types.Operator):
     """Generate a D4"""
     bl_idname = 'mesh.d4_add'
@@ -860,9 +913,11 @@ class D4Generator(bpy.types.Operator):
     bl_description = 'Generate a tetrahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
+    number_indicator_type = NUMBER_IND_NONE
+
     size: FloatProperty(
-        name='Face2point Length',
-        description='Face-to-point size of the die',
+        name='Face2Face Length',
+        description='Face-to-face size of the die',
         min=1,
         soft_min=1,
         max=100,
@@ -916,18 +971,87 @@ class D4Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
+        return execute_generator(self, context, Tetrahedron, 'd4')
 
-        # create the cube mesh
-        die = Tetrahedron('d4', self.size, self.number_center_offset)
-        die.create(context)
 
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
+class D4CrystalGenerator(bpy.types.Operator):
+    """Generate a D4 crystal"""
+    bl_idname = 'mesh.d4_crystal_add'
+    bl_label = 'D4 Crystal'
+    bl_description = 'Generate a D4 crystal dice'
+    bl_options = {'REGISTER', 'UNDO'}
 
-        return {'FINISHED'}
+    number_indicator_type = NUMBER_IND_NONE
+
+    size: FloatProperty(
+        name='Face2point Length',
+        description='Face-to-point size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=12,
+        unit='LENGTH'
+    )
+
+    base_height: FloatProperty(
+        name='Base Height',
+        description='Base height of the die (height of a face)',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=14,
+        unit='LENGTH'
+    )
+
+    point_height: FloatProperty(
+        name='Point Height',
+        description='Point height of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=7,
+        unit='LENGTH'
+    )
+
+    add_numbers: BoolProperty(
+        name='Generate Numbers',
+        default=True
+    )
+
+    number_scale: FloatProperty(
+        name='Number Scale',
+        description='Size of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=1
+    )
+
+    number_depth: FloatProperty(
+        name='Number Depth',
+        description='Depth of the numbers on the die',
+        min=0.1,
+        soft_min=0.1,
+        max=2,
+        soft_max=2,
+        default=0.75,
+        unit='LENGTH'
+    )
+
+    font_path: StringProperty(
+        name='Font',
+        description='Number font',
+        maxlen=1024,
+        subtype='FILE_PATH'
+    )
+
+    def execute(self, context):
+        return execute_generator(self, context, D4Crystal, 'd4Crystal', base_height=self.base_height,
+                                 point_height=self.point_height)
 
 
 class D6Generator(bpy.types.Operator):
@@ -1049,21 +1173,7 @@ class D6Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = Cube('d6', self.size)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
-                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
-                               self.center_bar)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, Cube, 'd6')
 
 
 class D8Generator(bpy.types.Operator):
@@ -1185,21 +1295,7 @@ class D8Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = Octahedron('d8', self.size)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
-                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
-                               self.center_bar)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, Octahedron, 'd8')
 
 
 class D12Generator(bpy.types.Operator):
@@ -1321,21 +1417,7 @@ class D12Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = Dodecahedron('d12', self.size)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
-                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
-                               self.center_bar)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, Dodecahedron, 'd12')
 
 
 class D20Generator(bpy.types.Operator):
@@ -1457,21 +1539,7 @@ class D20Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = Icosahedron('d20', self.size)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
-                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
-                               self.center_bar)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, Icosahedron, 'd20')
 
 
 class D10Generator(bpy.types.Operator):
@@ -1613,21 +1681,7 @@ class D10Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = D10Mesh('d10', self.size, self.height, self.number_v_offset)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path,
-                               self.number_indicator_type, self.period_indicator_scale, self.period_indicator_space,
-                               self.bar_indicator_height, self.bar_indicator_width, self.bar_indicator_space,
-                               self.center_bar)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, D10Mesh, 'd10')
 
 
 class D100Generator(bpy.types.Operator):
@@ -1702,18 +1756,7 @@ class D100Generator(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # set font to emtpy if it's not a ttf file
-        self.font_path = validate_font_path(self.font_path)
-
-        # create the cube mesh
-        die = D100Mesh('d100', self.size, self.height, self.number_v_offset)
-        die.create(context)
-
-        # create number curves
-        if self.add_numbers:
-            die.create_numbers(context, self.size, self.number_scale, self.number_depth, self.font_path)
-
-        return {'FINISHED'}
+        return execute_generator(self, context, D100Mesh, 'd100')
 
 
 class MeshDiceAdd(Menu):
@@ -1728,6 +1771,7 @@ class MeshDiceAdd(Menu):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator('mesh.d4_add', text='D4 Tetrahedron')
+        layout.operator('mesh.d4_crystal_add', text='D4 Crystal')
         layout.operator('mesh.d6_add', text='D6 Cube')
         layout.operator('mesh.d8_add', text='D8 Octahedron')
         layout.operator('mesh.d10_add', text='D10 Trapezohedron')
@@ -1748,6 +1792,7 @@ def menu_func(self, context):
 classes = [
     MeshDiceAdd,
     D4Generator,
+    D4CrystalGenerator,
     D6Generator,
     D8Generator,
     D10Generator,
