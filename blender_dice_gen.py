@@ -1100,6 +1100,16 @@ class D4CrystalGenerator(bpy.types.Operator):
         subtype='FILE_PATH'
     )
 
+    one_offset: FloatProperty(
+        name='Number 1 Offset',
+        description='Offset the number 1 horizontally for an alternative centering',
+        min=0,
+        soft_min=0,
+        max=1,
+        soft_max=1,
+        default=0
+    )
+
     def execute(self, context):
         return execute_generator(self, context, D4Crystal, 'd4Crystal', base_height=self.base_height,
                                  point_height=self.point_height)
