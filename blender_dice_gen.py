@@ -948,6 +948,133 @@ def execute_generator(op, context, mesh_cls, name, **kwargs):
     return {'FINISHED'}
 
 
+# Common properties
+def Face2FaceProperty(default: float):
+    return FloatProperty(
+        name='Face2face Length',
+        description='Face-to-face size of the die',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=default,
+        unit='LENGTH'
+    )
+
+
+AddNumbersProperty = BoolProperty(
+    name='Generate Numbers',
+    default=True
+)
+
+NumberScaleProperty = FloatProperty(
+    name='Number Scale',
+    description='Size of the numbers on the die',
+    min=0.1,
+    soft_min=0.1,
+    max=2,
+    soft_max=2,
+    default=1
+)
+
+NumberDepthProperty = FloatProperty(
+    name='Number Depth',
+    description='Depth of the numbers on the die',
+    min=0.1,
+    soft_min=0.1,
+    max=2,
+    soft_max=2,
+    default=0.75,
+    unit='LENGTH'
+)
+
+FontPathProperty = StringProperty(
+    name='Font',
+    description='Number font',
+    maxlen=1024,
+    subtype='FILE_PATH'
+)
+
+OneOffsetProperty = FloatProperty(
+    name='Number 1 Offset',
+    description='Offset the number 1 horizontally for an alternative centering',
+    min=0,
+    soft_min=0,
+    max=1,
+    soft_max=1,
+    default=0
+)
+
+
+# Indicator properties
+def NumberIndicatorTypeProperty(default: str = NUMBER_IND_PERIOD):
+    return EnumProperty(
+        name='Orientation Indicator',
+        items=((NUMBER_IND_NONE, 'None', ','),
+               (NUMBER_IND_BAR, 'Bar', ''),
+               (NUMBER_IND_PERIOD, 'Period', '')),
+        default=default,
+        description='Orientation indicator for numbers 6 and 9'
+    )
+
+
+PeriodIndicatorScaleProperty = FloatProperty(
+    name='Period Scale',
+    description='Scale of the period orientation indicator',
+    min=0.1,
+    soft_min=0.1,
+    max=2,
+    soft_max=2,
+    default=1
+)
+
+PeriodIndicatorSpaceProperty = FloatProperty(
+    name='Period Space',
+    description='Space between the period orientation indicator and the number',
+    min=0,
+    soft_min=0,
+    max=3,
+    soft_max=3,
+    default=1
+)
+
+BarIndicatorHeightProperty = FloatProperty(
+    name='Bar Height',
+    description='Height scale of the bar orientation indicator',
+    min=0.1,
+    soft_min=0.1,
+    max=3,
+    soft_max=3,
+    default=1
+)
+
+BarIndicatorWidthProperty = FloatProperty(
+    name='Bar Width',
+    description='Width scale of the bar orientation indicator',
+    min=0.1,
+    soft_min=0.1,
+    max=2,
+    soft_max=2,
+    default=1
+)
+
+BarIndicatorSpaceProperty = FloatProperty(
+    name='Bar Space',
+    description='Space between the bar orientation indicator and the number',
+    min=0,
+    soft_min=0,
+    max=3,
+    soft_max=3,
+    default=1
+)
+
+CenterBarProperty = BoolProperty(
+    name='Center Align Bar',
+    description='If true, the bar indicator is included in the vertical alignment of the number',
+    default=True
+)
+
+
 class D4Generator(bpy.types.Operator):
     """Generate a D4"""
     bl_idname = 'mesh.d4_add'
@@ -968,38 +1095,15 @@ class D4Generator(bpy.types.Operator):
         unit='LENGTH'
     )
 
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
+    add_numbers: AddNumbersProperty
 
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
+    number_scale: NumberScaleProperty
 
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
+    number_depth: NumberDepthProperty
 
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
+    font_path: FontPathProperty
+
+    one_offset: OneOffsetProperty
 
     number_center_offset: FloatProperty(
         name='Number Center Offset',
@@ -1009,16 +1113,6 @@ class D4Generator(bpy.types.Operator):
         max=1,
         soft_max=1,
         default=0.5
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
     )
 
     def execute(self, context):
@@ -1034,16 +1128,7 @@ class D4CrystalGenerator(bpy.types.Operator):
 
     number_indicator_type = NUMBER_IND_NONE
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=12,
-        unit='LENGTH'
-    )
+    size: Face2FaceProperty(12)
 
     base_height: FloatProperty(
         name='Base Height',
@@ -1067,48 +1152,11 @@ class D4CrystalGenerator(bpy.types.Operator):
         unit='LENGTH'
     )
 
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D4Crystal, 'd4Crystal', base_height=self.base_height,
@@ -1155,38 +1203,11 @@ class D4ShardGenerator(bpy.types.Operator):
         default=1.75
     )
 
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
 
     number_v_offset: FloatProperty(
         name='Number V Offset',
@@ -1196,16 +1217,6 @@ class D4ShardGenerator(bpy.types.Operator):
         max=1,
         soft_max=1,
         default=0.7
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
     )
 
     def execute(self, context):
@@ -1220,126 +1231,19 @@ class D6Generator(bpy.types.Operator):
     bl_description = 'Generate a cube dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=16,
-        unit='LENGTH'
-    )
-
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
-
-    number_indicator_type: EnumProperty(
-        name='Orientation Indicator',
-        items=(
-            (NUMBER_IND_NONE, 'None', ','),
-            (NUMBER_IND_BAR, 'Bar', ''),
-            (NUMBER_IND_PERIOD, 'Period', ''),
-        ),
-        default=NUMBER_IND_NONE,
-        description='Orientation indicator for numbers 6 and 9'
-    )
-
-    period_indicator_scale: FloatProperty(
-        name='Period Scale',
-        description='Scale of the period orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    period_indicator_space: FloatProperty(
-        name='Period Space',
-        description='Space between the period orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_height: FloatProperty(
-        name='Bar Height',
-        description='Height scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_width: FloatProperty(
-        name='Bar Width',
-        description='Width scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    bar_indicator_space: FloatProperty(
-        name='Bar Space',
-        description='Space between the bar orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    center_bar: BoolProperty(
-        name='Center Align Bar',
-        description='If true, the bar indicator is included in the vertical alignment of the number',
-        default=True
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    size: Face2FaceProperty(16)
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
+    number_indicator_type: NumberIndicatorTypeProperty(NUMBER_IND_NONE)
+    period_indicator_scale: PeriodIndicatorScaleProperty
+    period_indicator_space: PeriodIndicatorSpaceProperty
+    bar_indicator_height: BarIndicatorHeightProperty
+    bar_indicator_width: BarIndicatorWidthProperty
+    bar_indicator_space: BarIndicatorSpaceProperty
+    center_bar: CenterBarProperty
 
     def execute(self, context):
         return execute_generator(self, context, Cube, 'd6')
@@ -1352,126 +1256,19 @@ class D8Generator(bpy.types.Operator):
     bl_description = 'Generate a octahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=15,
-        unit='LENGTH'
-    )
-
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
-
-    number_indicator_type: EnumProperty(
-        name='Orientation Indicator',
-        items=(
-            (NUMBER_IND_NONE, 'None', ','),
-            (NUMBER_IND_BAR, 'Bar', ''),
-            (NUMBER_IND_PERIOD, 'Period', ''),
-        ),
-        default=NUMBER_IND_NONE,
-        description='Orientation indicator for numbers 6 and 9'
-    )
-
-    period_indicator_scale: FloatProperty(
-        name='Period Scale',
-        description='Scale of the period orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    period_indicator_space: FloatProperty(
-        name='Period Space',
-        description='Space between the period orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_height: FloatProperty(
-        name='Bar Height',
-        description='Height scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_width: FloatProperty(
-        name='Bar Width',
-        description='Width scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    bar_indicator_space: FloatProperty(
-        name='Bar Space',
-        description='Space between the bar orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    center_bar: BoolProperty(
-        name='Center Align Bar',
-        description='If true, the bar indicator is included in the vertical alignment of the number',
-        default=True
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    size: Face2FaceProperty(15)
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
+    number_indicator_type: NumberIndicatorTypeProperty(NUMBER_IND_NONE)
+    period_indicator_scale: PeriodIndicatorScaleProperty
+    period_indicator_space: PeriodIndicatorSpaceProperty
+    bar_indicator_height: BarIndicatorHeightProperty
+    bar_indicator_width: BarIndicatorWidthProperty
+    bar_indicator_space: BarIndicatorSpaceProperty
+    center_bar: CenterBarProperty
 
     def execute(self, context):
         return execute_generator(self, context, Octahedron, 'd8')
@@ -1484,126 +1281,19 @@ class D12Generator(bpy.types.Operator):
     bl_description = 'Generate a dodecahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=18,
-        unit='LENGTH'
-    )
-
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
-
-    number_indicator_type: EnumProperty(
-        name='Orientation Indicator',
-        items=(
-            (NUMBER_IND_NONE, 'None', ','),
-            (NUMBER_IND_BAR, 'Bar', ''),
-            (NUMBER_IND_PERIOD, 'Period', ''),
-        ),
-        default=NUMBER_IND_PERIOD,
-        description='Orientation indicator for numbers 6 and 9'
-    )
-
-    period_indicator_scale: FloatProperty(
-        name='Period Scale',
-        description='Scale of the period orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    period_indicator_space: FloatProperty(
-        name='Period Space',
-        description='Space between the period orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_height: FloatProperty(
-        name='Bar Height',
-        description='Height scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_width: FloatProperty(
-        name='Bar Width',
-        description='Width scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    bar_indicator_space: FloatProperty(
-        name='Bar Space',
-        description='Space between the bar orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    center_bar: BoolProperty(
-        name='Center Align Bar',
-        description='If true, the bar indicator is included in the vertical alignment of the number',
-        default=True
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    size: Face2FaceProperty(18)
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
+    number_indicator_type: NumberIndicatorTypeProperty()
+    period_indicator_scale: PeriodIndicatorScaleProperty
+    period_indicator_space: PeriodIndicatorSpaceProperty
+    bar_indicator_height: BarIndicatorHeightProperty
+    bar_indicator_width: BarIndicatorWidthProperty
+    bar_indicator_space: BarIndicatorSpaceProperty
+    center_bar: CenterBarProperty
 
     def execute(self, context):
         return execute_generator(self, context, Dodecahedron, 'd12')
@@ -1616,126 +1306,19 @@ class D20Generator(bpy.types.Operator):
     bl_description = 'Generate an icosahedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=20,
-        unit='LENGTH'
-    )
-
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
-
-    number_indicator_type: EnumProperty(
-        name='Orientation Indicator',
-        items=(
-            (NUMBER_IND_NONE, 'None', ','),
-            (NUMBER_IND_BAR, 'Bar', ''),
-            (NUMBER_IND_PERIOD, 'Period', ''),
-        ),
-        default=NUMBER_IND_PERIOD,
-        description='Orientation indicator for numbers 6 and 9'
-    )
-
-    period_indicator_scale: FloatProperty(
-        name='Period Scale',
-        description='Scale of the period orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    period_indicator_space: FloatProperty(
-        name='Period Space',
-        description='Space between the period orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_height: FloatProperty(
-        name='Bar Height',
-        description='Height scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_width: FloatProperty(
-        name='Bar Width',
-        description='Width scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    bar_indicator_space: FloatProperty(
-        name='Bar Space',
-        description='Space between the bar orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    center_bar: BoolProperty(
-        name='Center Align Bar',
-        description='If true, the bar indicator is included in the vertical alignment of the number',
-        default=True
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    size: Face2FaceProperty(20)
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
+    number_indicator_type: NumberIndicatorTypeProperty()
+    period_indicator_scale: PeriodIndicatorScaleProperty
+    period_indicator_space: PeriodIndicatorSpaceProperty
+    bar_indicator_height: BarIndicatorHeightProperty
+    bar_indicator_width: BarIndicatorWidthProperty
+    bar_indicator_space: BarIndicatorSpaceProperty
+    center_bar: CenterBarProperty
 
     def execute(self, context):
         return execute_generator(self, context, Icosahedron, 'd20')
@@ -1748,16 +1331,7 @@ class D10Generator(bpy.types.Operator):
     bl_description = 'Generate an d10 trapezohedron dice'
     bl_options = {'REGISTER', 'UNDO'}
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=17,
-        unit='LENGTH'
-    )
+    size: Face2FaceProperty(17)
 
     height: FloatProperty(
         name='Dice Height',
@@ -1769,38 +1343,11 @@ class D10Generator(bpy.types.Operator):
         default=2 / 3
     )
 
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
 
     number_v_offset: FloatProperty(
         name='Number V Offset',
@@ -1812,82 +1359,13 @@ class D10Generator(bpy.types.Operator):
         default=1 / 3
     )
 
-    number_indicator_type: EnumProperty(
-        name='Orientation Indicator',
-        items=(
-            (NUMBER_IND_NONE, 'None', ','),
-            (NUMBER_IND_BAR, 'Bar', ''),
-            (NUMBER_IND_PERIOD, 'Period', ''),
-        ),
-        default=NUMBER_IND_PERIOD,
-        description='Orientation indicator for numbers 6 and 9'
-    )
-
-    period_indicator_scale: FloatProperty(
-        name='Period Scale',
-        description='Scale of the period orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    period_indicator_space: FloatProperty(
-        name='Period Space',
-        description='Space between the period orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_height: FloatProperty(
-        name='Bar Height',
-        description='Height scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    bar_indicator_width: FloatProperty(
-        name='Bar Width',
-        description='Width scale of the bar orientation indicator',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    bar_indicator_space: FloatProperty(
-        name='Bar Space',
-        description='Space between the bar orientation indicator and the number',
-        min=0,
-        soft_min=0,
-        max=3,
-        soft_max=3,
-        default=1
-    )
-
-    center_bar: BoolProperty(
-        name='Center Align Bar',
-        description='If true, the bar indicator is included in the vertical alignment of the number',
-        default=True
-    )
-
-    one_offset: FloatProperty(
-        name='Number 1 Offset',
-        description='Offset the number 1 horizontally for an alternative centering',
-        min=0,
-        soft_min=0,
-        max=1,
-        soft_max=1,
-        default=0
-    )
+    number_indicator_type: NumberIndicatorTypeProperty()
+    period_indicator_scale: PeriodIndicatorScaleProperty
+    period_indicator_space: PeriodIndicatorSpaceProperty
+    bar_indicator_height: BarIndicatorHeightProperty
+    bar_indicator_width: BarIndicatorWidthProperty
+    bar_indicator_space: BarIndicatorSpaceProperty
+    center_bar: CenterBarProperty
 
     def execute(self, context):
         return execute_generator(self, context, D10Mesh, 'd10', height=self.height,
@@ -1904,16 +1382,7 @@ class D100Generator(bpy.types.Operator):
     number_indicator_type = NUMBER_IND_NONE
     one_offset = 0
 
-    size: FloatProperty(
-        name='Face2face Length',
-        description='Face-to-face size of the die',
-        min=1,
-        soft_min=1,
-        max=100,
-        soft_max=100,
-        default=17,
-        unit='LENGTH'
-    )
+    size: Face2FaceProperty(17)
 
     height: FloatProperty(
         name='Dice Height',
@@ -1925,38 +1394,10 @@ class D100Generator(bpy.types.Operator):
         default=2 / 3
     )
 
-    add_numbers: BoolProperty(
-        name='Generate Numbers',
-        default=True
-    )
-
-    number_scale: FloatProperty(
-        name='Number Scale',
-        description='Size of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=1
-    )
-
-    number_depth: FloatProperty(
-        name='Number Depth',
-        description='Depth of the numbers on the die',
-        min=0.1,
-        soft_min=0.1,
-        max=2,
-        soft_max=2,
-        default=0.75,
-        unit='LENGTH'
-    )
-
-    font_path: StringProperty(
-        name='Font',
-        description='Number font',
-        maxlen=1024,
-        subtype='FILE_PATH'
-    )
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
 
     number_v_offset: FloatProperty(
         name='Number V Offset',
