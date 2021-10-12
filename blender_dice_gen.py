@@ -12,7 +12,7 @@ from add_mesh_extra_objects.add_mesh_solid import createPolys
 bl_info = {
     'name': 'Dice Gen',
     'author': 'Long Tran',
-    'version': (1, 1, 0),
+    'version': (1, 1, 1),
     'blender': (2, 93, 0),
     'location': 'View3D > Add > Mesh',
     'description': 'Generate polyhedral dice models.',
