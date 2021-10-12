@@ -958,8 +958,8 @@ class D4Generator(bpy.types.Operator):
     number_indicator_type = NUMBER_IND_NONE
 
     size: FloatProperty(
-        name='Face2Face Length',
-        description='Face-to-face size of the die',
+        name='Face2Point Length',
+        description='Face-to-point size of the die',
         min=1,
         soft_min=1,
         max=100,
@@ -1035,8 +1035,8 @@ class D4CrystalGenerator(bpy.types.Operator):
     number_indicator_type = NUMBER_IND_NONE
 
     size: FloatProperty(
-        name='Face2point Length',
-        description='Face-to-point size of the die',
+        name='Face2face Length',
+        description='Face-to-face size of the die',
         min=1,
         soft_min=1,
         max=100,
