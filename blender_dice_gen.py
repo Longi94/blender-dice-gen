@@ -165,7 +165,7 @@ class Tetrahedron(Mesh):
         return [
             (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi / 4, HALF_PI),
             (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, -math.pi / 4, 0),
-            ((math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, math.pi / 4),
+            (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, math.pi, math.pi / 4),
             (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, -math.pi / 4),
             (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 3 / 4, 0),
             (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 5 / 4, math.pi * 3 / 2),
