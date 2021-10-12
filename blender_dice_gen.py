@@ -1075,6 +1075,17 @@ CenterBarProperty = BoolProperty(
 )
 
 
+def NumberVOffsetProperty(default: float): return FloatProperty(
+    name='Number V Offset',
+    description='Vertical offset of the number positioning',
+    min=0.0,
+    soft_min=0.0,
+    max=1,
+    soft_max=1,
+    default=default
+)
+
+
 class D4Generator(bpy.types.Operator):
     """Generate a D4"""
     bl_idname = 'mesh.d4_add'
@@ -1208,16 +1219,7 @@ class D4ShardGenerator(bpy.types.Operator):
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
     one_offset: OneOffsetProperty
-
-    number_v_offset: FloatProperty(
-        name='Number V Offset',
-        description='Vertical offset of the number positioning',
-        min=0.0,
-        soft_min=0.0,
-        max=1,
-        soft_max=1,
-        default=0.7
-    )
+    number_v_offset: NumberVOffsetProperty(0.7)
 
     def execute(self, context):
         return execute_generator(self, context, D4Shard, 'd4Shard', top_point_height=self.top_point_height,
@@ -1348,17 +1350,7 @@ class D10Generator(bpy.types.Operator):
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
     one_offset: OneOffsetProperty
-
-    number_v_offset: FloatProperty(
-        name='Number V Offset',
-        description='Vertical offset of the number positioning',
-        min=0.0,
-        soft_min=0.0,
-        max=1,
-        soft_max=1,
-        default=1 / 3
-    )
-
+    number_v_offset: NumberVOffsetProperty(1 / 3)
     number_indicator_type: NumberIndicatorTypeProperty()
     period_indicator_scale: PeriodIndicatorScaleProperty
     period_indicator_space: PeriodIndicatorSpaceProperty
@@ -1398,16 +1390,7 @@ class D100Generator(bpy.types.Operator):
     number_scale: NumberScaleProperty
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
-
-    number_v_offset: FloatProperty(
-        name='Number V Offset',
-        description='Vertical offset of the number positioning',
-        min=0.0,
-        soft_min=0.0,
-        max=1,
-        soft_max=1,
-        default=1 / 3
-    )
+    number_v_offset: NumberVOffsetProperty(1 / 3)
 
     def execute(self, context):
         return execute_generator(self, context, D100Mesh, 'd100', height=self.height,
