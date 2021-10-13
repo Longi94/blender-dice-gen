@@ -2,10 +2,10 @@ import math
 import bpy
 import os
 from typing import List
-from math import sqrt, acos, pow
+from math import sqrt, acos, pow, cos, sin
 from mathutils import Vector, Matrix, Euler
 from bpy.types import Menu
-from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty
+from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty, IntProperty
 from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createPolys
 
@@ -176,6 +176,38 @@ class Tetrahedron(Mesh):
             (-(math.pi - CONSTANTS['tetrahedron']['dihedral_angle']) / 2, 0, math.pi * 3 / 4),
             (CONSTANTS['tetrahedron']['dihedral_angle'] / 2, math.pi * 3 / 4, math.pi)
         ]
+
+
+class D2Coin(Mesh):
+
+    def __init__(self, name, size, thickness, sides):
+        super().__init__(name)
+        self.thickness = thickness
+        self.vertices = []
+        self.faces = []
+
+        a = 2 * math.pi / sides
+        vertex_count = sides * 2
+        for i in range(sides):
+            x = cos(a * i) * size / 2
+            y = sin(a * i) * size / 2
+
+            self.vertices.append((x, y, thickness / 2))
+            self.vertices.append((x, y, -thickness / 2))
+            self.faces.append([i * 2 + 0, i * 2 + 1, (i * 2 + 3) % vertex_count, (i * 2 + 2) % vertex_count])
+
+        self.faces.append([i * 2 for i in range(sides)])
+        self.faces.append([i * 2 + 1 for i in range(sides)])
+        self.base_font_scale = 0.8
+
+    def get_numbers(self):
+        return ['1', '2']
+
+    def get_number_locations(self):
+        return [(0, 0, self.thickness / 2), (0, 0, -self.thickness / 2)]
+
+    def get_number_rotations(self):
+        return [(0, 0, -HALF_PI), (0, math.pi, -HALF_PI)]
 
 
 class D4Crystal(Mesh):
@@ -1086,6 +1118,57 @@ def NumberVOffsetProperty(default: float): return FloatProperty(
 )
 
 
+class D2Generator(bpy.types.Operator):
+    """Generate a D2"""
+    bl_idname = 'mesh.d2_add'
+    bl_label = 'D2 Coin'
+    bl_description = 'Generate a d2 coin dice'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    number_indicator_type = NUMBER_IND_NONE
+
+    size: FloatProperty(
+        name='Diameter',
+        description='Diameter of the D2 coin (point to point)',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=20,
+        unit='LENGTH'
+    )
+
+    thickness: FloatProperty(
+        name='Thickness',
+        description='Thickness of the coin',
+        min=1,
+        soft_min=1,
+        max=100,
+        soft_max=100,
+        default=2,
+        unit='LENGTH'
+    )
+
+    sides: IntProperty(
+        name='Sides',
+        description='Number of sides the coin will have. More sides will make a smoother round coin',
+        min=3,
+        soft_min=3,
+        max=128,
+        soft_max=128,
+        default=32
+    )
+
+    add_numbers: AddNumbersProperty
+    number_scale: NumberScaleProperty
+    number_depth: NumberDepthProperty
+    font_path: FontPathProperty
+    one_offset: OneOffsetProperty
+
+    def execute(self, context):
+        return execute_generator(self, context, D2Coin, 'd2', thickness=self.thickness, sides=self.sides)
+
+
 class D4Generator(bpy.types.Operator):
     """Generate a D4"""
     bl_idname = 'mesh.d4_add'
@@ -1107,13 +1190,9 @@ class D4Generator(bpy.types.Operator):
     )
 
     add_numbers: AddNumbersProperty
-
     number_scale: NumberScaleProperty
-
     number_depth: NumberDepthProperty
-
     font_path: FontPathProperty
-
     one_offset: OneOffsetProperty
 
     number_center_offset: FloatProperty(
@@ -1408,6 +1487,7 @@ class MeshDiceAdd(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator_context = 'INVOKE_REGION_WIN'
+        layout.operator('mesh.d2_add', text='D2 Coin')
         layout.operator('mesh.d4_add', text='D4 Tetrahedron')
         layout.operator('mesh.d4_crystal_add', text='D4 Crystal')
         layout.operator('mesh.d4_shard_add', text='D4 Shard')
@@ -1430,6 +1510,7 @@ def menu_func(self, context):
 
 classes = [
     MeshDiceAdd,
+    D2Generator,
     D4Generator,
     D4CrystalGenerator,
     D4ShardGenerator,
