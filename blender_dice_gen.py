@@ -8,6 +8,7 @@ from bpy.types import Menu
 from bpy.props import FloatProperty, BoolProperty, StringProperty, EnumProperty, IntProperty
 from bpy_extras.object_utils import object_data_add
 from add_mesh_extra_objects.add_mesh_solid import createPolys
+from io_curve_svg.import_svg import SVGLoader
 
 bl_info = {
     'name': 'Dice Gen',
@@ -24,6 +25,9 @@ bl_info = {
 NUMBER_IND_NONE = 'none'
 NUMBER_IND_BAR = 'bar'
 NUMBER_IND_PERIOD = 'period'
+
+LOGO_LOC_MAX = 0
+LOGO_LOC_MIN = 1
 
 HALF_PI = math.pi / 2
 
@@ -101,6 +105,7 @@ class Mesh:
         return []
 
     def create_numbers(self, context, size, number_scale, number_depth, font_path, one_offset,
+                       logo_svg, logo_location, logo_scale, logo_rotation, logo_horizontal, logo_vertical,
                        number_indicator_type=NUMBER_IND_NONE, period_indicator_scale=1, period_indicator_space=1,
                        bar_indicator_height=1, bar_indicator_width=1, bar_indicator_space=1,
                        center_bar=True):
@@ -113,7 +118,8 @@ class Mesh:
         numbers_object = create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth,
                                         number_indicator_type, period_indicator_scale, period_indicator_space,
                                         bar_indicator_height, bar_indicator_width, bar_indicator_space,
-                                        center_bar, one_offset)
+                                        center_bar, one_offset, logo_svg, logo_location, logo_scale, logo_rotation,
+                                        logo_horizontal, logo_vertical)
 
         if numbers_object is not None:
             apply_boolean_modifier(self.dice_mesh, numbers_object)
@@ -810,8 +816,15 @@ def join(objects):
 
 
 def validate_font_path(filepath):
-    # set font to emtpy if it's not a ttf file
-    if filepath and os.path.splitext(filepath)[1].lower() not in ('.ttf', '.otf'):
+    return validate_ext(filepath, ('.ttf', '.otf'))
+
+
+def validate_svg_path(filepath):
+    return validate_ext(filepath, ('.svg',))
+
+
+def validate_ext(filepath, exts):
+    if filepath and os.path.splitext(filepath)[1].lower() not in exts:
         return ''
     return filepath
 
@@ -863,14 +876,20 @@ def create_text_mesh(context, text, font_path, font_size, name, extrude=0):
 
 def create_numbers(context, numbers, locations, rotations, font_path, font_size, number_depth, number_indicator_type,
                    period_indicator_scale, period_indicator_space, bar_indicator_height, bar_indicator_width,
-                   bar_indicator_space, center_bar, one_offset):
+                   bar_indicator_space, center_bar, one_offset, logo_svg, logo_location, logo_scale, logo_rotation,
+                   logo_horizontal, logo_vertical):
     number_objs = []
     # create the number meshes
     for i in range(len(locations)):
-        number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
-                                      rotations[i], number_indicator_type, period_indicator_scale,
-                                      period_indicator_space, bar_indicator_height, bar_indicator_width,
-                                      bar_indicator_space, center_bar, one_offset)
+        if logo_svg and ((i == 1 and logo_location == LOGO_LOC_MIN) or
+                         (i == len(locations) - 1 and logo_location == LOGO_LOC_MAX)):
+            number_object = create_logo(context, font_size, number_depth, locations[i], rotations[i], logo_svg,
+                                        logo_scale, logo_rotation, logo_horizontal, logo_vertical)
+        elif:
+            number_object = create_number(context, numbers[i], font_path, font_size, number_depth, locations[i],
+                                          rotations[i], number_indicator_type, period_indicator_scale,
+                                          period_indicator_space, bar_indicator_height, bar_indicator_width,
+                                          bar_indicator_space, center_bar, one_offset)
         number_objs.append(number_object)
 
     # join the numbers into a single object
@@ -960,9 +979,45 @@ def create_number(context, number, font_path, font_size, number_depth, location,
     return mesh_object
 
 
+def create_logo(context, font_size, number_depth, location, rotation, logo_svg, logo_scale, logo_rotation,
+                logo_horizontal, logo_vertical):
+    # load the SVG and create curves
+    loader = SVGLoader(context, logo_svg, False)
+    loader.parse()
+    loader.createGeom(False)
+
+    curve_meshes = []
+
+    for curve in loader.getGeometries()[0]._context['collection'].objects:
+        # convert the curve into a mesh
+        mesh = curve.to_mesh().copy()
+        curve.to_mesh_clear()
+        bpy.data.objects.remove(curve)
+        curve_meshes.append(object_data_add(context, mesh, operator=None))
+
+    logo_mesh = join(curve_meshes)
+    set_origin_center_bounds(logo_mesh)
+
+    # apply solidify modifier
+    logo_solidify = logo_mesh.modifiers.new(type='SOLIDIFY', name='logo_solidify')
+    logo_solidify.offset = 0
+    logo_solidify.thickness = number_depth * 2
+
+    logo_mesh.location.x = location[0]
+    logo_mesh.location.y = location[1]
+    logo_mesh.location.z = location[2]
+
+    logo_mesh.rotation_euler.x = rotation[0]
+    logo_mesh.rotation_euler.y = rotation[1]
+    logo_mesh.rotation_euler.z = rotation[2]
+
+    return logo_mesh
+
+
 def execute_generator(op, context, mesh_cls, name, **kwargs):
     # set font to emtpy if it's not a ttf file
     op.font_path = validate_font_path(op.font_path)
+    op.logo_svg = validate_svg_path(op.logo_svg)
 
     # create the cube mesh
     die = mesh_cls(name, op.size, **kwargs)
@@ -971,9 +1026,13 @@ def execute_generator(op, context, mesh_cls, name, **kwargs):
     # create number curves
     if op.add_numbers:
         if op.number_indicator_type == NUMBER_IND_NONE:
-            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path, op.one_offset)
+            die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path, op.one_offset,
+                               op.logo_svg, op.logo_location, op.logo_scale, op.logo_rotation, op.logo_horizontal,
+                               op.logo_vertical)
         else:
             die.create_numbers(context, op.size, op.number_scale, op.number_depth, op.font_path, op.one_offset,
+                               op.logo_svg, op.logo_location, op.logo_scale, op.logo_rotation, op.logo_horizontal,
+                               op.logo_vertical,
                                op.number_indicator_type, op.period_indicator_scale, op.period_indicator_space,
                                op.bar_indicator_height, op.bar_indicator_width, op.bar_indicator_space, op.center_bar)
 
@@ -1042,7 +1101,7 @@ OneOffsetProperty = FloatProperty(
 def NumberIndicatorTypeProperty(default: str = NUMBER_IND_PERIOD):
     return EnumProperty(
         name='Orientation Indicator',
-        items=((NUMBER_IND_NONE, 'None', ','),
+        items=((NUMBER_IND_NONE, 'None', ''),
                (NUMBER_IND_BAR, 'Bar', ''),
                (NUMBER_IND_PERIOD, 'Period', '')),
         default=default,
@@ -1106,6 +1165,62 @@ CenterBarProperty = BoolProperty(
     default=True
 )
 
+LogoSvgProperty = StringProperty(
+    name='Logo SVG',
+    description='Apply a custom SVG to a face',
+    maxlen=1024,
+    subtype='FILE_PATH'
+)
+
+LogoLocationProperty = EnumProperty(
+    name='Logo Location',
+    items=((LOGO_LOC_MAX, 'Max Face', ''),
+           (LOGO_LOC_MIN, 'Min Face', '')),
+    default=LOGO_LOC_MAX,
+    description='Which face the logo should be applied to'
+)
+
+LogoScaleProperty = FloatProperty(
+    name='Logo Scale',
+    description='Size of the custom SVG logo',
+    min=0.1,
+    soft_min=0.1,
+    max=3,
+    soft_max=3,
+    default=1
+)
+
+LogoRotationProperty = FloatProperty(
+    name='Logo Rotation',
+    description='Size of the custom SVG logo',
+    min=0,
+    soft_min=0,
+    max=2 * math.pi,
+    soft_max=2 * math.pi,
+    default=0,
+    unit='ROTATION'
+)
+
+LogoHorizontalOffsetProperty = FloatProperty(
+    name='Logo Horizontal',
+    description='Horizontal offset of the logo',
+    min=-1,
+    soft_min=-1,
+    max=1,
+    soft_max=1,
+    default=0
+)
+
+LogoVerticalOffsetProperty = FloatProperty(
+    name='Logo Vertical',
+    description='Vertical offset of the logo',
+    min=-1,
+    soft_min=-1,
+    max=1,
+    soft_max=1,
+    default=0
+)
+
 
 def NumberVOffsetProperty(default: float): return FloatProperty(
     name='Number V Offset',
@@ -1164,6 +1279,12 @@ class D2Generator(bpy.types.Operator):
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
     one_offset: OneOffsetProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D2Coin, 'd2', thickness=self.thickness, sides=self.sides)
@@ -1204,6 +1325,13 @@ class D4Generator(bpy.types.Operator):
         soft_max=1,
         default=0.5
     )
+
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, Tetrahedron, 'd4', number_center_offset=self.number_center_offset)
@@ -1247,6 +1375,12 @@ class D4CrystalGenerator(bpy.types.Operator):
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
     one_offset: OneOffsetProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D4Crystal, 'd4Crystal', base_height=self.base_height,
@@ -1299,6 +1433,12 @@ class D4ShardGenerator(bpy.types.Operator):
     font_path: FontPathProperty
     one_offset: OneOffsetProperty
     number_v_offset: NumberVOffsetProperty(0.7)
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D4Shard, 'd4Shard', top_point_height=self.top_point_height,
@@ -1325,6 +1465,12 @@ class D6Generator(bpy.types.Operator):
     bar_indicator_width: BarIndicatorWidthProperty
     bar_indicator_space: BarIndicatorSpaceProperty
     center_bar: CenterBarProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, Cube, 'd6')
@@ -1350,6 +1496,12 @@ class D8Generator(bpy.types.Operator):
     bar_indicator_width: BarIndicatorWidthProperty
     bar_indicator_space: BarIndicatorSpaceProperty
     center_bar: CenterBarProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, Octahedron, 'd8')
@@ -1375,6 +1527,12 @@ class D12Generator(bpy.types.Operator):
     bar_indicator_width: BarIndicatorWidthProperty
     bar_indicator_space: BarIndicatorSpaceProperty
     center_bar: CenterBarProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, Dodecahedron, 'd12')
@@ -1400,6 +1558,12 @@ class D20Generator(bpy.types.Operator):
     bar_indicator_width: BarIndicatorWidthProperty
     bar_indicator_space: BarIndicatorSpaceProperty
     center_bar: CenterBarProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, Icosahedron, 'd20')
@@ -1437,6 +1601,12 @@ class D10Generator(bpy.types.Operator):
     bar_indicator_width: BarIndicatorWidthProperty
     bar_indicator_space: BarIndicatorSpaceProperty
     center_bar: CenterBarProperty
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D10Mesh, 'd10', height=self.height,
@@ -1470,6 +1640,12 @@ class D100Generator(bpy.types.Operator):
     number_depth: NumberDepthProperty
     font_path: FontPathProperty
     number_v_offset: NumberVOffsetProperty(1 / 3)
+    logo_svg: LogoSvgProperty
+    logo_location: LogoLocationProperty
+    logo_scale: LogoScaleProperty
+    logo_rotation: LogoRotationProperty
+    logo_horizontal: LogoHorizontalOffsetProperty
+    logo_vertical: LogoVerticalOffsetProperty
 
     def execute(self, context):
         return execute_generator(self, context, D100Mesh, 'd100', height=self.height,
