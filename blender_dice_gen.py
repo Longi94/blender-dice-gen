@@ -822,7 +822,7 @@ def get_font(filepath):
         return next(filter(lambda x: x.filepath == filepath, bpy.data.fonts))
     else:
         bpy.data.fonts.load(filepath='<builtin>', check_existing=True)
-        return bpy.data.fonts['Bfont']
+        return bpy.data.fonts[0]
 
 
 def apply_boolean_modifier(body_object, numbers_object):
